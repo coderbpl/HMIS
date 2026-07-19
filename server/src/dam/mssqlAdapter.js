@@ -74,7 +74,7 @@ export function createMssqlAdapter() {
     },
 
     async getPatientById(id) {
-      const res = await exec('dbo.usp_Patient_GetByCode', r => r.input('PatientCode', sql.VarChar(12), id));
+      const res = await exec('dbo.usp_Patient_GetByCode', r => r.input('PatientCode', sql.VarChar(24), id));
       return rowToPatient(res.recordset[0]) || null;
     },
 
@@ -104,7 +104,7 @@ export function createMssqlAdapter() {
     async issueToken({ patientId, dept, priority = 'normal', category = 'normal', source = 'counter', symptoms = [], complaint = '', feeAmount = null, feeExemption = null, date = null, slot = null }) {
       const symptomText = complaint || (symptoms.length ? symptoms.join(', ') : null);
       const res = await exec('dbo.usp_Token_Issue', r => r
-        .input('PatientCode', sql.VarChar(12), patientId)
+        .input('PatientCode', sql.VarChar(24), patientId)
         .input('Department', sql.NVarChar(60), dept)
         .input('Priority', sql.VarChar(10), priority)
         .input('Category', sql.VarChar(10), category)

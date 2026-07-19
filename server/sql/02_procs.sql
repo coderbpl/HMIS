@@ -125,7 +125,7 @@ BEGIN
 END;
 GO
 
-CREATE OR ALTER PROCEDURE dbo.usp_Patient_GetByCode @PatientCode VARCHAR(12)
+CREATE OR ALTER PROCEDURE dbo.usp_Patient_GetByCode @PatientCode VARCHAR(24)
 AS
 BEGIN
   SET NOCOUNT ON;
@@ -207,7 +207,7 @@ END;
 GO
 
 CREATE OR ALTER PROCEDURE dbo.usp_Token_Issue
-  @PatientCode VARCHAR(12), @Department NVARCHAR(60), @Priority VARCHAR(10) = 'normal',
+  @PatientCode VARCHAR(24), @Department NVARCHAR(60), @Priority VARCHAR(10) = 'normal',
   @Category VARCHAR(10) = 'normal', @Source VARCHAR(8) = 'counter',
   @Complaint NVARCHAR(200) = NULL, @FeeAmount INT = NULL, @FeeExemption NVARCHAR(30) = NULL,
   @TokenDate DATE = NULL, @SlotTime CHAR(5) = NULL
