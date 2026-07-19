@@ -41,7 +41,10 @@ CREATE TABLE dbo.Patients (
   Abha        VARCHAR(20)   NULL,
   Scheme      NVARCHAR(40)  NULL,
   FacilityCode VARCHAR(20)  NULL,   -- FK added after dbo.Facilities exists (see end of script)
+  BloodGroup  VARCHAR(7)    NULL,
   AllergiesJson  NVARCHAR(MAX) NOT NULL DEFAULT '[]',
+  FoodAllergiesJson NVARCHAR(MAX) NOT NULL DEFAULT '[]',
+  FamilyJson     NVARCHAR(MAX) NOT NULL DEFAULT '[]',   -- [{relation, condition}]
   ConditionsJson NVARCHAR(MAX) NOT NULL DEFAULT '[]',
   MedsJson       NVARCHAR(MAX) NOT NULL DEFAULT '[]',
   CreatedAt   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME()
@@ -97,6 +100,7 @@ CREATE TABLE dbo.Vitals (
   Spo2       INT          NULL CHECK (Spo2 BETWEEN 50 AND 100),
   Rr         INT          NULL CHECK (Rr BETWEEN 5 AND 80),
   Weight     DECIMAL(5,1) NULL CHECK (Weight BETWEEN 1 AND 400),
+  Height     DECIMAL(5,1) NULL CHECK (Height BETWEEN 30 AND 250),
   RecordedBy INT          NULL REFERENCES dbo.Users(UserId),
   RecordedAt DATETIME2    NOT NULL DEFAULT SYSUTCDATETIME()
 );

@@ -287,7 +287,7 @@ export function Triage() {
   const [rows, setRows] = useState([]);
   const [live, setLive] = useState(false);
   const [sel, setSel] = useState(null);
-  const [v, setV] = useState({ bp: '', pulse: '', temp: '', spo2: '', rr: '', weight: '' });
+  const [v, setV] = useState({ bp: '', pulse: '', temp: '', spo2: '', rr: '', weight: '', height: '' });
   const [msg, setMsg] = useState(null); // { ok, text }
   const [busy, setBusy] = useState(false);
   const setv = k => e => setV(x => ({ ...x, [k]: e.target.value }));
@@ -306,7 +306,7 @@ export function Triage() {
     try {
       const body = {};
       if (v.bp) body.bp = v.bp;
-      for (const k of ['pulse', 'temp', 'spo2', 'rr', 'weight']) if (v[k] !== '') body[k] = Number(v[k]);
+      for (const k of ['pulse', 'temp', 'spo2', 'rr', 'weight', 'height']) if (v[k] !== '') body[k] = Number(v[k]);
       if (live) await api.saveVitals(sel.id, body);
       setMsg({ ok: true, text: `Vitals saved for ${sel.patient.name} (${sel.tokenNo}) — visible to the doctor now.` });
       setSel(null); setV({ bp: '', pulse: '', temp: '', spo2: '', rr: '', weight: '' });
@@ -352,6 +352,10 @@ export function Triage() {
         <div className="f-row">
           <div className="f-group"><label className="f-label">Weight (kg)</label><input className="f-inp" inputMode="decimal" value={v.weight} onChange={setv('weight')} style={{ minHeight: 48, fontSize: 15 }} /></div>
           <div className="f-group"><label className="f-label">RR (/min)</label><input className="f-inp" inputMode="numeric" value={v.rr} onChange={setv('rr')} style={{ minHeight: 48, fontSize: 15 }} /></div>
+        </div>
+        <div className="f-row">
+          <div className="f-group"><label className="f-label">Height (cm) <em style={{ fontWeight: 500, color: 'var(--muted)' }}>· enables BMI</em></label><input className="f-inp" inputMode="numeric" placeholder="165" value={v.height} onChange={setv('height')} style={{ minHeight: 48, fontSize: 15 }} /></div>
+          <div className="f-group" />
         </div>
         <button className="btn primary block" style={{ minHeight: 50 }} disabled={!sel || busy}>
           <Icon name="check" size={15} /> {busy ? 'Saving…' : sel ? `Save vitals for ${sel.tokenNo}` : 'Select a patient first'}

@@ -177,7 +177,7 @@ GO
 
 CREATE OR ALTER PROCEDURE dbo.usp_Vitals_Save
   @TokenRef VARCHAR(16), @Bp VARCHAR(9), @Pulse INT, @Temp DECIMAL(5,1),
-  @Spo2 INT, @Rr INT, @Weight DECIMAL(5,1), @ActorRef VARCHAR(16)
+  @Spo2 INT, @Rr INT, @Weight DECIMAL(5,1), @Height DECIMAL(5,1) = NULL, @ActorRef VARCHAR(16)
 AS
 BEGIN
   SET NOCOUNT ON;
@@ -187,8 +187,8 @@ BEGIN
   IF @PatientId IS NULL THROW 50003, 'Token not found', 1;
 
   BEGIN TRAN;
-    INSERT INTO dbo.Vitals (TokenId, PatientId, Bp, Pulse, Temp, Spo2, Rr, Weight, RecordedBy)
-    VALUES (@TokenId, @PatientId, @Bp, @Pulse, @Temp, @Spo2, @Rr, @Weight, TRY_CAST(@ActorRef AS INT));
+    INSERT INTO dbo.Vitals (TokenId, PatientId, Bp, Pulse, Temp, Spo2, Rr, Weight, Height, RecordedBy)
+    VALUES (@TokenId, @PatientId, @Bp, @Pulse, @Temp, @Spo2, @Rr, @Weight, @Height, TRY_CAST(@ActorRef AS INT));
 
     UPDATE dbo.Tokens SET VitalsDone = 1 WHERE TokenId = @TokenId;
 
@@ -358,12 +358,15 @@ BEGIN
          t.TokenDate, t.Status, t.Priority, t.Category, t.Source, t.SlotTime,
          t.VitalsDone, t.IssuedAt, t.ArrivedAt, t.CalledAt,
          p.PatientCode, p.FullName, p.Mobile, p.Age, p.Sex, d.Name AS Department,
-         p.Abha, p.Scheme, p.AllergiesJson, p.ConditionsJson, p.MedsJson,
+         p.Abha, p.Scheme, p.BloodGroup, p.AllergiesJson, p.FoodAllergiesJson, p.FamilyJson,
+         p.ConditionsJson, p.MedsJson,
          t.Complaint, NULL AS LastVisit,
-         NULL AS Bp, NULL AS Pulse, NULL AS Temp, NULL AS Spo2, NULL AS Rr, NULL AS Weight
+         v.Bp, v.Pulse, v.Temp, v.Spo2, v.Rr, v.Weight, v.Height, v.RecordedAt AS VitalsAt
   FROM dbo.Tokens t
   JOIN dbo.Patients p ON p.PatientId = t.PatientId
   JOIN dbo.Departments d ON d.DeptId = t.DeptId
+  OUTER APPLY (SELECT TOP 1 Bp, Pulse, Temp, Spo2, Rr, Weight, Height, RecordedAt
+               FROM dbo.Vitals WHERE TokenId = t.TokenId ORDER BY RecordedAt DESC) v
   WHERE t.TokenDate = CAST(SYSUTCDATETIME() AS DATE)
     AND t.Status <> 'done' AND t.Status <> 'cancelled'
     AND (@Department IS NULL OR d.Name = @Department)
@@ -480,9 +483,11 @@ END;
 GO
 
 CREATE OR ALTER PROCEDURE dbo.usp_Consult_Save
-  @TokenRef VARCHAR(16), @DoctorRef VARCHAR(16), @Diagnosis NVARCHAR(200),
+  @TokenRef VARCHAR(16), @DoctorRef VARCHAR(16), @Diagnosis NVARCHAR(400),
   @RxJson NVARCHAR(MAX), @LabsJson NVARCHAR(MAX),
-  @Disposition VARCHAR(12), @Notes NVARCHAR(MAX)
+  @Disposition VARCHAR(12), @Notes NVARCHAR(MAX),
+  @AllergiesJson NVARCHAR(MAX) = NULL, @FoodAllergiesJson NVARCHAR(MAX) = NULL,
+  @BloodGroup VARCHAR(7) = NULL, @FamilyJson NVARCHAR(MAX) = NULL
 AS
 BEGIN
   SET NOCOUNT ON;
@@ -498,6 +503,14 @@ BEGIN
     DECLARE @ConsultId INT = SCOPE_IDENTITY();
 
     UPDATE dbo.Tokens SET Status = 'done' WHERE TokenId = @TokenId;
+
+    -- clinical context recorded in-consult persists on the patient record
+    UPDATE dbo.Patients SET
+      AllergiesJson     = COALESCE(@AllergiesJson, AllergiesJson),
+      FoodAllergiesJson = COALESCE(@FoodAllergiesJson, FoodAllergiesJson),
+      BloodGroup        = COALESCE(@BloodGroup, BloodGroup),
+      FamilyJson        = COALESCE(@FamilyJson, FamilyJson)
+    WHERE PatientId = @PatientId;
 
     -- Create Prescription if RxJson has items
     IF @RxJson IS NOT NULL AND @RxJson <> '[]' AND @RxJson <> ''

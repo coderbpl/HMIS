@@ -244,3 +244,57 @@ export const DEMO_PRESCRIPTIONS = [
     dispensedAt: null
   }
 ];
+
+/* ---------- clinical reference lists for the consult workspace ---------- */
+export const ICD10 = [
+  { code: 'I20.9', label: 'Angina pectoris' },
+  { code: 'I10', label: 'Essential hypertension' },
+  { code: 'E11.9', label: 'Type 2 diabetes mellitus' },
+  { code: 'E10.9', label: 'Type 1 diabetes mellitus' },
+  { code: 'R07.4', label: 'Chest pain, unspecified' },
+  { code: 'J06.9', label: 'Acute upper respiratory infection (URTI)' },
+  { code: 'J18.9', label: 'Pneumonia, unspecified' },
+  { code: 'J45.9', label: 'Asthma, unspecified' },
+  { code: 'J44.9', label: 'COPD, unspecified' },
+  { code: 'A09.9', label: 'Gastroenteritis, unspecified' },
+  { code: 'K29.7', label: 'Gastritis, unspecified' },
+  { code: 'K30', label: 'Functional dyspepsia' },
+  { code: 'A90', label: 'Dengue fever' },
+  { code: 'B50.9', label: 'Malaria (P. falciparum)' },
+  { code: 'A01.0', label: 'Typhoid / enteric fever' },
+  { code: 'A15.0', label: 'Pulmonary tuberculosis' },
+  { code: 'N39.0', label: 'Urinary tract infection' },
+  { code: 'M17.9', label: 'Osteoarthritis of knee' },
+  { code: 'M54.5', label: 'Low back pain' },
+  { code: 'R50.9', label: 'Fever, unspecified' },
+  { code: 'R51', label: 'Headache' },
+  { code: 'G43.9', label: 'Migraine' },
+  { code: 'D64.9', label: 'Anaemia, unspecified' },
+  { code: 'E03.9', label: 'Hypothyroidism' },
+  { code: 'E05.9', label: 'Hyperthyroidism' },
+  { code: 'E78.5', label: 'Dyslipidaemia' },
+  { code: 'K75.9', label: 'Fatty liver / hepatitis NOS' },
+  { code: 'N18.9', label: 'Chronic kidney disease' },
+  { code: 'L30.9', label: 'Dermatitis, unspecified' },
+  { code: 'H66.9', label: 'Otitis media' },
+  { code: 'J02.9', label: 'Acute pharyngitis' },
+  { code: 'O26.9', label: 'Pregnancy-related condition' },
+  { code: 'Z34.9', label: 'Routine antenatal care (ANC)' },
+  { code: 'F41.9', label: 'Anxiety disorder' },
+  { code: 'F32.9', label: 'Depressive episode' },
+];
+
+export const LAB_GROUPS = [
+  { group: 'Blood', tests: ['CBC', 'Blood Sugar (F/PP)', 'RBS', 'HbA1c', 'LFT', 'KFT', 'Lipid Profile', 'TSH', 'CRP', 'Blood Group & Rh'] },
+  { group: 'Urine & Stool', tests: ['Urine R/M', 'Urine Culture', 'Urine Pregnancy Test', 'Stool R/M'] },
+  { group: 'Cardiac & Imaging', tests: ['ECG', 'ECHO', 'X-Ray Chest PA', 'USG Abdomen', 'CT Head (refer)'] },
+  { group: 'Serology & Infection', tests: ['Dengue NS1', 'Malaria (MP/RDT)', 'Widal', 'HIV', 'HBsAg', 'Sputum AFB (TB)'] },
+];
+
+export const MED_ALLERGENS = ['Penicillin', 'Sulfa drugs', 'NSAIDs', 'Aspirin', 'Cephalosporins', 'Quinolones', 'Local anaesthetics'];
+export const FOOD_ALLERGENS = ['Peanuts', 'Milk / lactose', 'Eggs', 'Seafood', 'Soy', 'Wheat / gluten', 'Brinjal'];
+export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-', 'Unknown'];
+export const FH_RELATIONS = ['Father', 'Mother', 'Brother', 'Sister', 'Son', 'Daughter', 'Grandparent'];
+export const FH_CONDITIONS = ['Diabetes', 'Hypertension', 'Heart disease', 'Stroke', 'TB', 'Asthma', 'Cancer', 'Thyroid disorder', 'Kidney disease'];
+export const PAST_ILLNESS = ['Diabetes', 'Hypertension', 'TB (treated)', 'Asthma', 'Jaundice', 'Thyroid disorder', 'Epilepsy', 'Previous surgery', 'COVID (severe)'];
+export const SOCIAL_HABITS = ['Smoking', 'Alcohol', 'Tobacco / gutka', 'None'];

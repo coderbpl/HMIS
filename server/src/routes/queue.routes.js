@@ -77,8 +77,9 @@ route({
     spo2: z.coerce.number().min(50).max(100).optional(),
     rr: z.coerce.number().min(5).max(80).optional(),
     weight: z.coerce.number().min(1).max(400).optional(),
+    height: z.coerce.number().min(30).max(250).optional(),  // cm — enables BMI for the doctor
   }),
-  bodyExample: { bp: '132/86', pulse: 78, temp: 98.2, spo2: 97, rr: 16, weight: 70 },
+  bodyExample: { bp: '132/86', pulse: 78, temp: 98.2, spo2: 97, rr: 16, weight: 70, height: 165 },
   responses: {
     200: { description: 'Token with vitalsDone=true', schemaRef: 'Token' },
     404: { description: 'Unknown token', schemaRef: 'Error' },

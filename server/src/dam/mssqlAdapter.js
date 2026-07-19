@@ -22,9 +22,13 @@ export function createMssqlAdapter() {
     dept: r.Department, abha: r.Abha, scheme: r.Scheme,
     complaint: r.Complaint || '', lastVisit: r.LastVisit || 'First visit',
     allergies: JSON.parse(r.AllergiesJson || '[]'),
+    foodAllergies: JSON.parse(r.FoodAllergiesJson || '[]'),
+    familyHistory: JSON.parse(r.FamilyJson || '[]'),
+    bloodGroup: r.BloodGroup || null,
     conditions: JSON.parse(r.ConditionsJson || '[]'),
     meds: JSON.parse(r.MedsJson || '[]'),
     bp: r.Bp, pulse: r.Pulse, temp: r.Temp, spo2: r.Spo2, rr: r.Rr, weight: r.Weight,
+    height: r.Height ?? null, vitalsAt: r.VitalsAt ?? null,
   });
 
   const rowToToken = r => r && ({
@@ -97,6 +101,7 @@ export function createMssqlAdapter() {
         .input('Spo2', sql.Int, vitals.spo2 ?? null)
         .input('Rr', sql.Int, vitals.rr ?? null)
         .input('Weight', sql.Decimal(5, 1), vitals.weight ?? null)
+        .input('Height', sql.Decimal(5, 1), vitals.height ?? null)
         .input('ActorRef', sql.VarChar(16), String(actorId || '').replace(/^U-/, '')));
       return rowToToken(res.recordset[0]);
     },
@@ -192,15 +197,19 @@ export function createMssqlAdapter() {
       }));
     },
 
-    async saveConsult({ tokenId, doctorId, dx, rx, labs, dispo, notes }) {
+    async saveConsult({ tokenId, doctorId, dx, rx, labs, dispo, notes, allergies, bloodGroup, familyHistory }) {
       const res = await exec('dbo.usp_Consult_Save', r => r
         .input('TokenRef', sql.VarChar(16), String(tokenId).replace(/^T-/, ''))
         .input('DoctorRef', sql.VarChar(16), String(doctorId || '').replace(/^U-/, ''))
-        .input('Diagnosis', sql.NVarChar(200), dx || null)
+        .input('Diagnosis', sql.NVarChar(400), dx || null)
         .input('RxJson', sql.NVarChar(sql.MAX), JSON.stringify(rx || []))
         .input('LabsJson', sql.NVarChar(sql.MAX), JSON.stringify(labs || []))
         .input('Disposition', sql.VarChar(12), dispo || 'home')
-        .input('Notes', sql.NVarChar(sql.MAX), notes || ''));
+        .input('Notes', sql.NVarChar(sql.MAX), notes || '')
+        .input('AllergiesJson', sql.NVarChar(sql.MAX), allergies?.med?.length ? JSON.stringify(allergies.med) : null)
+        .input('FoodAllergiesJson', sql.NVarChar(sql.MAX), allergies?.food?.length ? JSON.stringify(allergies.food) : null)
+        .input('BloodGroup', sql.VarChar(7), bloodGroup && bloodGroup !== 'Unknown' ? bloodGroup : null)
+        .input('FamilyJson', sql.NVarChar(sql.MAX), familyHistory?.length ? JSON.stringify(familyHistory) : null));
       const c = res.recordset[0];
       return { id: `C-${c.ConsultId}`, tokenId, dispo: c.Disposition, completedAt: c.CompletedAt };
     },

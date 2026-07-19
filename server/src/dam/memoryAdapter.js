@@ -280,6 +280,8 @@ export function createMemoryAdapter() {
       Object.assign(p, {
         bp: vitals.bp ?? p.bp, pulse: vitals.pulse ?? p.pulse, temp: vitals.temp ?? p.temp,
         spo2: vitals.spo2 ?? p.spo2, rr: vitals.rr ?? p.rr, weight: vitals.weight ?? p.weight,
+        height: vitals.height ?? p.height,
+        vitalsAt: new Date().toISOString(),
       });
       t.vitalsDone = true;
       await this.audit({ actorId, action: 'vitals.save', entity: 'token', entityId: t.id, detail: vitals.bp || '' });
@@ -448,7 +450,7 @@ export function createMemoryAdapter() {
       };
     },
 
-    async saveConsult({ tokenId, doctorId, dx, rx, labs, dispo, notes }) {
+    async saveConsult({ tokenId, doctorId, dx, rx, labs, dispo, notes, allergies, bloodGroup, familyHistory, pastIllness, social }) {
       const t = db.tokens.find(x => x.id === tokenId || x.tokenNo === tokenId);
       if (!t) throw Object.assign(new Error('Token not found'), { status: 404 });
       const c = {
@@ -458,6 +460,19 @@ export function createMemoryAdapter() {
       };
       db.consults.push(c);
       t.status = 'done';
+
+      // clinical context recorded during the consult lives on the patient record
+      const pat = db.patients.find(x => x.id === t.patientId);
+      if (pat) {
+        if (allergies) {
+          pat.allergies = [...new Set([...(pat.allergies || []), ...allergies.med])];
+          pat.foodAllergies = [...new Set([...(pat.foodAllergies || []), ...allergies.food])];
+        }
+        if (bloodGroup && bloodGroup !== 'Unknown') pat.bloodGroup = bloodGroup;
+        if (familyHistory?.length) pat.familyHistory = familyHistory;
+        if (pastIllness?.length) pat.conditions = [...new Set([...(pat.conditions || []), ...pastIllness])];
+        if (social?.length) pat.social = social;
+      }
       
       if (rx && rx.length > 0) {
         const doctor = db.users.find(u => u.id === doctorId);
