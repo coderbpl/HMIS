@@ -24,6 +24,7 @@ export const DAM_METHODS = [
   'getPublicQueue',       // (dept) -> masked queue rows (no PHI)
   'updateTokenStatus',    // (tokenId, status, actorId) -> token
   'trackToken',           // ({ mobile, tokenNo }) -> { tokenNo, status, position, nowServing } | null
+  'listTokensByMobile',   // (mobile) -> [{ tokenNo, dept, date, slot, status }] active today/upcoming
   'saveConsult',          // ({ tokenId, doctorId, dx, rx, labs, dispo, notes }) -> consult
   'listDepartments',      // () -> [{ code, name, series }]
   'audit',                // ({ actorId, action, entity, entityId, detail }) -> void

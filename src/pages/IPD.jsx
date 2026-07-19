@@ -78,7 +78,7 @@ export function IpdChart({ bed, onClose }) {
           <div className="kv"><span className="k">Ward · Bed</span><span className="v">{bed.ward} · {bed.no}</span></div>
           <div className="kv"><span className="k">Diagnosis</span><span className="v">{bed.dx}</span></div>
           <div className="kv"><span className="k">Day of stay</span><span className="v">Day {bed.los}</span></div>
-          <div className="kv"><span className="k">Consultant</span><span className="v">Dr. Asha Verma</span></div>
+          <div className="kv"><span className="k">Consultant</span><span className="v">Dr. Ravi Verma</span></div>
           <div className="kv"><span className="k">Diet</span><span className="v">Soft diabetic diet</span></div>
           <div className="kv"><span className="k">Status</span><span className="v"><StatusPill s={bed.state} /></span></div>
         </div>
@@ -134,7 +134,7 @@ export function IpdChart({ bed, onClose }) {
         <div className="card">
           <SecHead title="Progress notes" />
           <div className="tl">
-            <div className="tl-item"><b>Day {bed.los} · Morning rounds</b><span>Today 09:30 · Dr. Asha Verma</span><p>Afebrile overnight spike settled with PCM. Chest clearer on right base. Continue IV antibiotics, reassess for oral switch tomorrow.</p></div>
+            <div className="tl-item"><b>Day {bed.los} · Morning rounds</b><span>Today 09:30 · Dr. Ravi Verma</span><p>Afebrile overnight spike settled with PCM. Chest clearer on right base. Continue IV antibiotics, reassess for oral switch tomorrow.</p></div>
             <div className="tl-item"><b>Nursing note</b><span>Today 06:00 · Sr. Meena Joshi</span><p>Slept well. Tolerating oral feeds. IV site healthy, no phlebitis.</p></div>
             <div className="tl-item"><b>Admission note</b><span>{bed.los} days ago · ER</span><p>Admitted with {bed.dx?.toLowerCase()}. Baseline workup sent, first antibiotic dose given in ER.</p></div>
           </div>

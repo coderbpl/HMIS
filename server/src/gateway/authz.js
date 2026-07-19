@@ -38,7 +38,7 @@ export function authenticate(req, res, next) {
   try {
     const p = jwt.verify(token, config.jwt.secret, { issuer: config.jwt.issuer });
     if (p.typ === 'refresh') throw new Error('refresh token used as access token');
-    req.user = { id: p.sub, role: p.role, name: p.name };
+    req.user = { id: p.sub, role: p.role, name: p.name, facilityCode: p.fac || null };
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid or expired session', correlationId: req.id });
@@ -65,7 +65,7 @@ export const requireRole = (...roles) => (req, res, next) => {
 
 export function signAccessToken(user) {
   return jwt.sign(
-    { sub: user.id, role: user.role, name: user.name },
+    { sub: user.id, role: user.role, name: user.name, fac: user.facilityCode || null },
     config.jwt.secret,
     { expiresIn: config.jwt.expiresIn, issuer: config.jwt.issuer },
   );

@@ -39,12 +39,59 @@ export default function PatientPortal({ onExit }) {
   const [genBusy, setGenBusy] = useState(false);
   const [issued, setIssued] = useState(null);
 
+  // OTP — mobile ownership proof before a token is issued
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [demoCode, setDemoCode] = useState(null);
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  const sendOtp = async () => {
+    setGenErr('');
+    if (!/^[6-9]\d{9}$/.test(g.mobile)) { setGenErr('Enter your 10-digit mobile number first.'); return; }
+    setOtpBusy(true);
+    try {
+      const r = await api.requestOtp(g.mobile);
+      setOtpSent(true); setOtp(''); setDemoCode(r.demoCode || null); setCooldown(60);
+    } catch (err) {
+      setGenErr(err.offline ? 'Cannot reach the hospital server.' : err.message);
+    } finally { setOtpBusy(false); }
+  };
+
   // tracking
   const [mobile, setMobile] = useState('');
   const [tokenNo, setTokenNo] = useState('');
   const [mine, setMine] = useState(null);
   const [trackErr, setTrackErr] = useState('');
   const [checkBusy, setCheckBusy] = useState(false);
+
+  // recovery ("I closed the browser / lost my token number") — mobile + OTP
+  const [rec, setRec] = useState({ on: false, sent: false, otp: '', demo: null, busy: false, list: null, cooldown: 0 });
+  useEffect(() => {
+    if (rec.cooldown <= 0) return;
+    const t = setTimeout(() => setRec(r => ({ ...r, cooldown: r.cooldown - 1 })), 1000);
+    return () => clearTimeout(t);
+  }, [rec.cooldown]);
+
+  // Device memory: the last token survives the tab closing. On reopen we
+  // re-track it silently — no typing, no OTP (mobile+token pair is the proof).
+  const LS_KEY = 'hmis.myToken';
+  const remember = (mob, tok) => { try { localStorage.setItem(LS_KEY, JSON.stringify({ mobile: mob, tokenNo: tok })); } catch { /* private mode */ } };
+  useEffect(() => {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch { /* ignore */ }
+    if (!saved?.mobile || !saved?.tokenNo) return;
+    setMobile(saved.mobile); setTokenNo(saved.tokenNo);
+    api.trackToken(saved.mobile, saved.tokenNo).then(info => {
+      setMine(info); setMode('track'); setDept(info.dept);
+    }).catch(() => { try { localStorage.removeItem(LS_KEY); } catch { /* ignore */ } });
+  }, []);
 
   const setg = k => e => setG(x => ({ ...x, [k]: e.target.value }));
   const symptomLabel = s => `${s.en} · ${s.hin}`;
@@ -100,11 +147,14 @@ export default function PatientPortal({ onExit }) {
     if (hasAbha && !g.abha.trim()) { setGenErr('Enter your ABHA number, or switch to "No ABHA".'); return; }
     if (!symptoms.length) { setGenErr('Tap at least one symptom so we can send you to the right department.'); return; }
     if (when === 'advance' && !slot) { setGenErr('Pick a time slot for your visit.'); return; }
+    if (!otpSent) { setGenErr('Tap "Send OTP" and enter the code from the SMS.'); return; }
+    if (!/^\d{6}$/.test(otp)) { setGenErr('Enter the 6-digit OTP sent to your mobile.'); return; }
     setGenBusy(true);
     try {
       const codes = symptomList.filter(s => symptoms.includes(symptomLabel(s))).map(s => s.code);
       const body = {
         mobile: g.mobile,
+        otp,
         symptoms: codes,
         ...(deptOverride ? { dept: deptOverride } : {}),
         ...(hasAbha
@@ -115,6 +165,7 @@ export default function PatientPortal({ onExit }) {
       const res = await api.selfToken(body);
       setIssued(res);
       setMobile(g.mobile); setTokenNo(res.token.tokenNo);
+      remember(g.mobile, res.token.tokenNo);
       if (res.token.dept !== dept) setDept(res.token.dept);
       const info = await api.trackToken(g.mobile, res.token.tokenNo).catch(() => null);
       if (info) { setMine(info); setMode('track'); }
@@ -129,11 +180,49 @@ export default function PatientPortal({ onExit }) {
     try {
       const info = await api.trackToken(mobile, tokenNo);
       setMine(info);
+      remember(mobile, tokenNo);
       if (info.dept !== dept) setDept(info.dept);
     } catch (err) {
       setMine(null);
       setTrackErr(err.offline ? 'Cannot reach the hospital server right now.' : err.message);
     }
+  };
+
+  const recSendOtp = async () => {
+    setTrackErr('');
+    if (!/^[6-9]\d{9}$/.test(mobile)) { setTrackErr('Enter your 10-digit mobile number first.'); return; }
+    setRec(r => ({ ...r, busy: true }));
+    try {
+      const r = await api.requestOtp(mobile);
+      setRec(x => ({ ...x, sent: true, otp: '', demo: r.demoCode || null, cooldown: 60, list: null, busy: false }));
+    } catch (err) {
+      setTrackErr(err.offline ? 'Cannot reach the hospital server.' : err.message);
+      setRec(x => ({ ...x, busy: false }));
+    }
+  };
+
+  const recFind = async () => {
+    setTrackErr('');
+    if (!/^\d{6}$/.test(rec.otp)) { setTrackErr('Enter the 6-digit OTP from the SMS.'); return; }
+    setRec(r => ({ ...r, busy: true }));
+    try {
+      const { tokens } = await api.myTokens(mobile, rec.otp);
+      setRec(r => ({ ...r, list: tokens, busy: false }));
+      if (!tokens.length) setTrackErr('No active tokens for this mobile — today or upcoming.');
+    } catch (err) {
+      setTrackErr(err.message);
+      setRec(r => ({ ...r, busy: false }));
+    }
+  };
+
+  const recPick = async (t) => {
+    setTrackErr('');
+    setTokenNo(t.tokenNo);
+    remember(mobile, t.tokenNo);
+    try {
+      const info = await api.trackToken(mobile, t.tokenNo);
+      setMine(info); setDept(info.dept);
+    } catch (err) { setTrackErr(err.message); }
   };
 
   const doCheckIn = async () => {
@@ -259,9 +348,30 @@ export default function PatientPortal({ onExit }) {
 
                 <div className="f-group">
                   <label className="f-label" htmlFor="g-mob">Mobile number <em className="hin">· मोबाइल</em></label>
-                  <input id="g-mob" className="f-inp" inputMode="numeric" placeholder="10 digits" value={g.mobile}
-                    onChange={e => setG(x => ({ ...x, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) }))} style={{ fontSize: 16, minHeight: 50 }} />
+                  <div style={{ display: 'flex', gap: 9 }}>
+                    <input id="g-mob" className="f-inp" inputMode="numeric" placeholder="10 digits" value={g.mobile}
+                      onChange={e => { setG(x => ({ ...x, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })); setOtpSent(false); setOtp(''); setDemoCode(null); }}
+                      style={{ fontSize: 16, minHeight: 50 }} />
+                    <button type="button" className="btn ghost" style={{ minHeight: 50, whiteSpace: 'nowrap' }}
+                      onClick={sendOtp} disabled={otpBusy || cooldown > 0 || g.mobile.length !== 10}>
+                      {otpBusy ? 'Sending…' : cooldown > 0 ? `Resend in ${cooldown}s` : otpSent ? 'Resend OTP' : 'Send OTP'}
+                    </button>
+                  </div>
                 </div>
+
+                {otpSent && (
+                  <div className="f-group">
+                    <label className="f-label" htmlFor="g-otp">OTP <em className="hin">· एसएमएस से 6 अंकों का कोड</em></label>
+                    <input id="g-otp" className="f-inp" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" value={otp}
+                      onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      style={{ fontSize: 20, minHeight: 52, letterSpacing: 6, fontWeight: 700, textAlign: 'center' }} />
+                    {demoCode && (
+                      <div className="offline-band" style={{ marginTop: 8 }}>
+                        Demo mode (no SMS gateway configured) — your OTP is <b>{demoCode}</b>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {genErr && <div className="offline-band" style={{ background: '#FBE5E3', borderColor: '#F2B8B3', color: '#A02E24' }}>{genErr}</div>}
                 <button className="btn primary block" style={{ minHeight: 52, fontSize: 15 }} disabled={genBusy}>
@@ -288,17 +398,77 @@ export default function PatientPortal({ onExit }) {
                     <div className="f-group">
                       <label className="f-label" htmlFor="pt-mob">Registered mobile number <em className="hin">· मोबाइल नंबर</em></label>
                       <input id="pt-mob" className="f-inp" inputMode="numeric" placeholder="10-digit mobile" value={mobile}
-                        onChange={e => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))} style={{ fontSize: 16, minHeight: 50 }} />
+                        onChange={e => { setMobile(e.target.value.replace(/\D/g, '').slice(0, 10)); setRec(r => ({ ...r, sent: false, otp: '', demo: null, list: null })); }}
+                        style={{ fontSize: 16, minHeight: 50 }} />
                     </div>
-                    <div className="f-group">
-                      <label className="f-label" htmlFor="pt-tok">Token number <em className="hin">· टोकन नंबर</em></label>
-                      <input id="pt-tok" className="f-inp" placeholder="e.g. A-17" value={tokenNo}
-                        onChange={e => setTokenNo(e.target.value.toUpperCase().slice(0, 6))} style={{ fontSize: 16, minHeight: 50 }} />
-                    </div>
-                    {trackErr && <div className="offline-band" style={{ background: '#FBE5E3', borderColor: '#F2B8B3', color: '#A02E24' }}>{trackErr}</div>}
-                    <button className="btn primary block" style={{ minHeight: 52, fontSize: 15 }}>
-                      <Icon name="search" size={16} /> Find my token
-                    </button>
+
+                    {!rec.on ? (
+                      <>
+                        <div className="f-group">
+                          <label className="f-label" htmlFor="pt-tok">Token number <em className="hin">· टोकन नंबर</em></label>
+                          <input id="pt-tok" className="f-inp" placeholder="e.g. A-17" value={tokenNo}
+                            onChange={e => setTokenNo(e.target.value.toUpperCase().slice(0, 6))} style={{ fontSize: 16, minHeight: 50 }} />
+                        </div>
+                        {trackErr && <div className="offline-band" style={{ background: '#FBE5E3', borderColor: '#F2B8B3', color: '#A02E24' }}>{trackErr}</div>}
+                        <button className="btn primary block" style={{ minHeight: 52, fontSize: 15 }}>
+                          <Icon name="search" size={16} /> Find my token
+                        </button>
+                        <button type="button" className="btn ghost block" style={{ marginTop: 10, minHeight: 48 }}
+                          onClick={() => { setRec(r => ({ ...r, on: true })); setTrackErr(''); }}>
+                          Don't remember the token number? <span className="hin">· OTP से खोजें</span>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="note-band" style={{ marginBottom: 12 }}>
+                          <span className="nd" style={{ background: 'var(--blue)' }} />
+                          <div><b>Find all your tokens with an OTP</b><span>We text a code to your mobile — no token number needed.</span></div>
+                        </div>
+                        <button type="button" className="btn primary block" style={{ minHeight: 50, marginBottom: 12 }}
+                          onClick={recSendOtp} disabled={rec.busy || rec.cooldown > 0 || mobile.length !== 10}>
+                          {rec.busy && !rec.sent ? 'Sending…' : rec.cooldown > 0 ? `Resend in ${rec.cooldown}s` : rec.sent ? 'Resend OTP' : 'Send OTP'}
+                        </button>
+                        {rec.sent && (
+                          <>
+                            <div className="f-group">
+                              <label className="f-label" htmlFor="rec-otp">OTP <em className="hin">· एसएमएस से कोड</em></label>
+                              <input id="rec-otp" className="f-inp" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" value={rec.otp}
+                                onChange={e => setRec(r => ({ ...r, otp: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                                style={{ fontSize: 20, minHeight: 52, letterSpacing: 6, fontWeight: 700, textAlign: 'center' }} />
+                              {rec.demo && (
+                                <div className="offline-band" style={{ marginTop: 8 }}>
+                                  Demo mode (no SMS gateway configured) — your OTP is <b>{rec.demo}</b>
+                                </div>
+                              )}
+                            </div>
+                            <button type="button" className="btn primary block" style={{ minHeight: 50 }}
+                              onClick={recFind} disabled={rec.busy || rec.otp.length !== 6}>
+                              <Icon name="search" size={16} /> {rec.busy ? 'Searching…' : 'Show my tokens'}
+                            </button>
+                          </>
+                        )}
+                        {rec.list?.length > 0 && (
+                          <div style={{ marginTop: 12 }}>
+                            <span className="tlabel">Your tokens <em>· tap one to track it</em></span>
+                            {rec.list.map(t => (
+                              <button type="button" key={`${t.date}-${t.tokenNo}`} className="tok" style={{ width: '100%', cursor: 'pointer' }} onClick={() => recPick(t)}>
+                                <div className="tno">{t.tokenNo}</div>
+                                <div className="tx" style={{ textAlign: 'left' }}>
+                                  <b>{t.dept}</b>
+                                  <span>{t.date === todayStr() ? 'Today' : fmtDate(t.date)}{t.slot ? ` · ${t.slot}` : ''}</span>
+                                </div>
+                                <StatusPill s={t.status} />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {trackErr && <div className="offline-band" style={{ marginTop: 10, background: '#FBE5E3', borderColor: '#F2B8B3', color: '#A02E24' }}>{trackErr}</div>}
+                        <button type="button" className="btn ghost sm block" style={{ marginTop: 10 }}
+                          onClick={() => { setRec(r => ({ ...r, on: false, list: null })); setTrackErr(''); }}>
+                          I have my token number
+                        </button>
+                      </>
+                    )}
                   </form>
                 ) : (
                   <div className="mytok">

@@ -51,7 +51,7 @@ export function createMemoryAdapter() {
     consultTemplates: [],
     prescriptions: []
   };
-  let seq = { patient: 24076, token: 0, consult: 0, template: 0, prescription: 0 };
+  let seq = { patient: 24076, token: 0, consult: 0, template: 0, prescription: 0, uhid: {} };
   const today = () => new Date().toISOString().slice(0, 10);
 
   const seedPatient = (p) => { db.patients.push(p); return p; };
@@ -67,17 +67,18 @@ export function createMemoryAdapter() {
     async init() {
       const passHash = await bcrypt.hash(config.seedPassword, 10);
       db.users = [
-        { id: 'U-1', username: 'dr.asha', name: 'Dr. Asha Verma', role: 'doctor', facilityCode: 'DIST_HOSP_01', passHash },
+        { id: 'U-1', username: 'dr.ravi', name: 'Dr. Ravi Verma', role: 'doctor', facilityCode: 'DIST_HOSP_01', passHash },
         { id: 'U-2', username: 'nurse.meena', name: 'Sr. Meena Joshi', role: 'nurse', facilityCode: 'DIST_HOSP_01', passHash },
         { id: 'U-3', username: 'frontdesk.rahul', name: 'Rahul Sen', role: 'reception', facilityCode: 'DIST_HOSP_01', passHash },
         { id: 'U-4', username: 'pharm.vikas', name: 'Vikas Rao', role: 'pharmacy', facilityCode: 'DIST_HOSP_01', passHash },
         { id: 'U-5', username: 'admin.sk', name: 'Dr. S. Kulkarni', role: 'admin', facilityCode: 'DIST_HOSP_01', passHash },
       ];
       
+      // state / district / short codes feed the UHID: MP-BPL-DH01-26-00001
       db.facilities = [
-        { code: 'DIST_HOSP_01', name: 'District Hospital, Bhopal', type: 'District Hospital', address: 'Bhopal' },
-        { code: 'PHC_AHD_02', name: 'Primary Health Centre, Anand Nagar', type: 'PHC', address: 'Anand Nagar' },
-        { code: 'CHC_COL_03', name: 'Community Health Centre, Kolar', type: 'CHC', address: 'Kolar' }
+        { code: 'DIST_HOSP_01', name: 'District Hospital, Bhopal', type: 'District Hospital', address: 'Bhopal', state: 'MP', district: 'BPL', short: 'DH01' },
+        { code: 'PHC_AHD_02', name: 'Primary Health Centre, Anand Nagar', type: 'PHC', address: 'Anand Nagar', state: 'MP', district: 'BPL', short: 'PH02' },
+        { code: 'CHC_COL_03', name: 'Community Health Centre, Kolar', type: 'CHC', address: 'Kolar', state: 'MP', district: 'BPL', short: 'CH03' }
       ];
 
       db.medicines = [
@@ -224,13 +225,26 @@ export function createMemoryAdapter() {
 
     async getUserById(id) {
       const u = db.users.find(x => x.id === id);
-      return u ? { id: u.id, username: u.username, name: u.name, role: u.role } : null;
+      return u ? { id: u.id, username: u.username, name: u.name, role: u.role, facilityCode: u.facilityCode || null } : null;
     },
 
-    async createPatient({ name, mobile, age, sex, dept, abha, scheme }) {
+    /**
+     * UHID format: {STATE}-{DISTRICT}-{FACILITY}-{YY}-{SEQ}
+     * e.g. MP-BPL-DH01-26-00001 — unique across every facility state-wide,
+     * human-readable on a slip, and the prefix tells you where the patient
+     * was first registered. Sequence resets per facility per year.
+     * (Legacy seed patients keep their old P-xxxxx ids.)
+     */
+    async createPatient({ name, mobile, age, sex, dept, abha, scheme, facilityCode }) {
+      const fac = db.facilities.find(f => f.code === facilityCode) || db.facilities[0];
+      const yy = String(new Date().getFullYear()).slice(-2);
+      const key = `${fac.code}-${yy}`;
+      seq.uhid[key] = (seq.uhid[key] || 0) + 1;
+      const uhid = `${fac.state}-${fac.district}-${fac.short}-${yy}-${String(seq.uhid[key]).padStart(5, '0')}`;
       const p = {
-        id: `P-${++seq.patient}`, name, mobile, age: Number(age), sex,
+        id: uhid, name, mobile, age: Number(age), sex,
         dept, abha: abha || null, scheme: scheme || null,
+        facilityCode: fac.code,
         complaint: '', allergies: [], conditions: [], meds: [],
         lastVisit: 'First visit', createdAt: new Date().toISOString(),
       };
@@ -307,6 +321,17 @@ export function createMemoryAdapter() {
       return t;
     },
 
+    /** Recovery lookup: every live token for a mobile, today or upcoming.
+     *  Callers must have proved mobile ownership (OTP) before using this. */
+    async listTokensByMobile(mobile) {
+      this.expireStaleBookings();
+      const pids = db.patients.filter(p => String(p.mobile) === String(mobile)).map(p => p.id);
+      return db.tokens
+        .filter(t => pids.includes(t.patientId) && t.date >= today() && t.status !== 'cancelled')
+        .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id, undefined, { numeric: true }))
+        .map(t => ({ tokenNo: t.tokenNo, dept: t.dept, date: t.date, slot: t.slot || null, status: t.status }));
+    },
+
     /** Unclaimed self-service tokens lapse after the grace period. */
     expireStaleBookings() {
       const now = Date.now();
@@ -378,6 +403,10 @@ export function createMemoryAdapter() {
         throw Object.assign(new Error(`Cannot move token from ${t.status} to ${status}`), { status: 409 });
       }
       if (status === 'in-consult') {
+        // triage gate: no patient reaches the doctor before vitals are recorded
+        if (!t.vitalsDone) {
+          throw Object.assign(new Error(`Vitals pending for ${t.tokenNo} — patient must pass triage first`), { status: 409 });
+        }
         // one patient in consult per department at a time
         db.tokens.filter(x => x.dept === t.dept && x.status === 'in-consult' && x.id !== t.id)
           .forEach(x => { x.status = 'waiting'; });

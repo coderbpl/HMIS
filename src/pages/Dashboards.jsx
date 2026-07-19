@@ -28,7 +28,7 @@ export function DoctorDashboard({ go, openConsult }) {
   const beds = bedStats();
   return (
     <>
-      <Hero name="Dr. Asha Verma" line={`OPD 9:00–13:00 · Room 104 · ${OPD_QUEUE.length} booked today`}>
+      <Hero name="Dr. Ravi Verma" line={`OPD 9:00–13:00 · Room 104 · ${OPD_QUEUE.length} booked today`}>
         {current && <button className="btn amber" onClick={() => openConsult(current)}><Icon name="stetho" size={16} /> Resume {current.token}</button>}
         <button className="btn ghost" style={{ background: 'rgba(255,255,255,.14)', border: 0, color: '#fff' }} onClick={() => go('ipd')}><Icon name="bed" size={16} /> Ward rounds</button>
       </Hero>

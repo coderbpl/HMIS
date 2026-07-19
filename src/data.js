@@ -1,7 +1,7 @@
 export const HOSPITAL = { name: 'Arogya HMIS', sub: 'District Hospital · Bhopal' };
 
 export const ROLES = [
-  { key: 'doctor', name: 'Doctor', hin: 'डॉक्टर', desc: 'OPD consults, IPD rounds, prescriptions', persona: 'Dr. Asha Verma', detail: 'General Medicine · MD', color: '#EAF1FD', ink: '#16357E', icon: 'stetho' },
+  { key: 'doctor', name: 'Doctor', hin: 'डॉक्टर', desc: 'OPD consults, IPD rounds, prescriptions', persona: 'Dr. Ravi Verma', detail: 'General Medicine · MD', color: '#EAF1FD', ink: '#16357E', icon: 'stetho' },
   { key: 'nurse', name: 'Nurse', hin: 'नर्स', desc: 'Vitals, triage, ward & bedside care', persona: 'Sr. Meena Joshi', detail: 'Ward In-charge · GNM', color: '#FDEEF4', ink: '#B03A6B', icon: 'heart' },
   { key: 'reception', name: 'Front Desk', hin: 'पंजीकरण', desc: 'Registration, appointments, billing', persona: 'Rahul Sen', detail: 'Registration Counter 2', color: '#E9F7F1', ink: '#116B46', icon: 'clip' },
   { key: 'pharmacy', name: 'Pharmacy & Lab', hin: 'फार्मेसी', desc: 'Dispensing, lab orders, inventory', persona: 'Vikas Rao', detail: 'Pharmacist · Central Store', color: '#FDF3E3', ink: '#8a5a00', icon: 'pill' },
@@ -66,13 +66,13 @@ export const WARDS = [
 ];
 
 export const APPOINTMENTS = [
-  { time: '09:00', name: 'Leela Bai', dept: 'General Medicine', doctor: 'Dr. Asha Verma', type: 'Follow-up', status: 'done' },
-  { time: '09:30', name: 'Ramesh Patel', dept: 'General Medicine', doctor: 'Dr. Asha Verma', type: 'New', status: 'done' },
+  { time: '09:00', name: 'Leela Bai', dept: 'General Medicine', doctor: 'Dr. Ravi Verma', type: 'Follow-up', status: 'done' },
+  { time: '09:30', name: 'Ramesh Patel', dept: 'General Medicine', doctor: 'Dr. Ravi Verma', type: 'New', status: 'done' },
   { time: '10:15', name: 'Arjun Malhotra', dept: 'Pediatrics', doctor: 'Dr. N. Iyer', type: 'New', status: 'in-progress' },
   { time: '10:25', name: 'Sunita Devi', dept: 'Obstetrics', doctor: 'Dr. F. Khan', type: 'ANC', status: 'waiting' },
   { time: '11:00', name: 'Fatima Begum', dept: 'Orthopedics', doctor: 'Dr. R. Saxena', type: 'Follow-up', status: 'waiting' },
   { time: '11:30', name: 'Kavita Sharma', dept: 'ENT', doctor: 'Dr. P. Nair', type: 'New', status: 'booked' },
-  { time: '12:00', name: 'Mohan Lal', dept: 'General Medicine', doctor: 'Dr. Asha Verma', type: 'Review', status: 'booked' },
+  { time: '12:00', name: 'Mohan Lal', dept: 'General Medicine', doctor: 'Dr. Ravi Verma', type: 'Review', status: 'booked' },
 ];
 
 export const WEEK_VISITS = [
@@ -86,10 +86,10 @@ export const WEEK_VISITS = [
 ];
 
 export const RX_QUEUE = [
-  { rx: 'RX-1182', name: 'Ramesh Patel', doctor: 'Dr. Asha Verma', items: 4, status: 'ready' },
-  { rx: 'RX-1183', name: 'Leela Bai', doctor: 'Dr. Asha Verma', items: 2, status: 'dispensing' },
+  { rx: 'RX-1182', name: 'Ramesh Patel', doctor: 'Dr. Ravi Verma', items: 4, status: 'ready' },
+  { rx: 'RX-1183', name: 'Leela Bai', doctor: 'Dr. Ravi Verma', items: 2, status: 'dispensing' },
   { rx: 'RX-1184', name: 'Gopal Yadav (GW-07)', doctor: 'Dr. N. Iyer', items: 6, status: 'queued' },
-  { rx: 'RX-1185', name: 'Prem Singh (GW-03)', doctor: 'Dr. Asha Verma', items: 3, status: 'queued' },
+  { rx: 'RX-1185', name: 'Prem Singh (GW-03)', doctor: 'Dr. Ravi Verma', items: 3, status: 'queued' },
   { rx: 'RX-1186', name: 'Kavita Sharma', doctor: 'Dr. P. Nair', items: 2, status: 'queued' },
 ];
 
@@ -113,7 +113,7 @@ export const INVOICES = [
 ];
 
 export const STAFF = [
-  { name: 'Dr. Asha Verma', role: 'Physician · Gen Med', shift: 'OPD 9–1', status: 'on-duty' },
+  { name: 'Dr. Ravi Verma', role: 'Physician · Gen Med', shift: 'OPD 9–1', status: 'on-duty' },
   { name: 'Dr. N. Iyer', role: 'Pediatrician', shift: 'OPD 9–1', status: 'on-duty' },
   { name: 'Dr. R. Saxena', role: 'Orthopedician', shift: 'OPD 9–1 · OT 2–5', status: 'on-duty' },
   { name: 'Sr. Meena Joshi', role: 'Ward In-charge', shift: 'Morning', status: 'on-duty' },
@@ -216,7 +216,7 @@ export const DEMO_PRESCRIPTIONS = [
     patientId: 'P-24071',
     patient: { id: 'P-24071', name: 'Ramesh Patel', age: 54, sex: 'M', mobile: '9800000001' },
     doctorId: 'U-1',
-    doctorName: 'Dr. Asha Verma',
+    doctorName: 'Dr. Ravi Verma',
     facilityCode: 'DIST_HOSP_01',
     status: 'pending',
     items: [
@@ -233,7 +233,7 @@ export const DEMO_PRESCRIPTIONS = [
     patientId: 'P-24073',
     patient: { id: 'P-24073', name: 'Arjun Malhotra', age: 8, sex: 'M', mobile: '9800000003' },
     doctorId: 'U-1',
-    doctorName: 'Dr. Asha Verma',
+    doctorName: 'Dr. Ravi Verma',
     facilityCode: 'DIST_HOSP_01',
     status: 'dispensing',
     items: [

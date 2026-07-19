@@ -6,7 +6,7 @@ import { api } from '../api.js';
 // Demo usernames per role — the cards prefill the form; authentication itself
 // always happens against the API with a real password.
 const DEMO_USERS = {
-  doctor: 'dr.asha',
+  doctor: 'dr.ravi',
   nurse: 'nurse.meena',
   reception: 'frontdesk.rahul',
   pharmacy: 'pharm.vikas',
@@ -66,7 +66,7 @@ export default function Login({ onAuthed, onOffline, onPatient }) {
           <div className="f-group">
             <label className="f-label" htmlFor="lg-user">Username</label>
             <input id="lg-user" className="f-inp" autoComplete="username" value={username}
-              onChange={e => setUsername(e.target.value)} placeholder="e.g. dr.asha" style={{ minHeight: 48 }} />
+              onChange={e => setUsername(e.target.value)} placeholder="e.g. dr.ravi" style={{ minHeight: 48 }} />
           </div>
           <div className="f-group">
             <label className="f-label" htmlFor="lg-pass">Password</label>

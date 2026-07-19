@@ -17,15 +17,20 @@ npm install && npm run dev                     # http://localhost:5173
 The Vite dev server proxies `/api` to `:4000`. If the API is down the UI falls back to
 built-in demo data and shows an "Offline demo" badge.
 
-**Demo sign-ins** (password `Demo@1234`, seeded): `dr.asha`, `nurse.meena`,
+**Demo sign-ins** (password `Demo@1234`, seeded): `dr.ravi`, `nurse.meena`,
 `frontdesk.rahul`, `pharm.vikas`, `admin.sk`. The login screen is a real
 username/password form — the role chips just prefill demo credentials. Patients need
 no login — "I'm a patient" opens the public queue board, token tracking (try mobile
 `9800000003` + token `A-15`), and **self-service token generation**:
 - **With ABHA**: ABHA number + the registered mobile (both must match the record).
-- **Without ABHA**: mobile number; first-time visitors add name/age/sex/department
+- **Without ABHA**: mobile number; first-time visitors add name/age/sex and a symptom
   and are registered on the spot. One open token per patient per day — asking again
   returns the existing token instead of duplicating.
+- **OTP-gated**: every self-service token requires a 6-digit OTP proving phone
+  ownership (`POST /api/public/otp/request` → code in SMS; 5-min validity, 60-s
+  resend cooldown, 5 attempts, single use, 10-min verified grace window). Codes are
+  stored hashed in the cache (Redis in production). Without `SMS_API_KEY` the code
+  is returned in the response marked `demo:true` so the flow stays testable.
 
 ## Architecture
 

@@ -55,7 +55,7 @@ export function createMssqlAdapter() {
       return u ? { id: `U-${u.UserId}`, username: u.Username, name: u.FullName, role: u.RoleName } : null;
     },
 
-    async createPatient({ name, mobile, age, sex, dept, abha, scheme }) {
+    async createPatient({ name, mobile, age, sex, dept, abha, scheme, facilityCode }) {
       const res = await exec('dbo.usp_Patient_Create', r => r
         .input('FullName', sql.NVarChar(120), name)
         .input('Mobile', sql.VarChar(15), mobile)
@@ -63,7 +63,8 @@ export function createMssqlAdapter() {
         .input('Sex', sql.Char(1), sex)
         .input('Department', sql.NVarChar(60), dept)
         .input('Abha', sql.VarChar(20), abha || null)
-        .input('Scheme', sql.NVarChar(40), scheme || null));
+        .input('Scheme', sql.NVarChar(40), scheme || null)
+        .input('FacilityCode', sql.VarChar(20), facilityCode || 'DIST_HOSP_01'));
       return rowToPatient(res.recordset[0]);
     },
 
@@ -180,6 +181,15 @@ export function createMssqlAdapter() {
         canCheckIn: !!row.CanCheckIn,
         prescriptionStatus: row.PrescriptionStatus || null
       };
+    },
+
+    async listTokensByMobile(mobile) {
+      const res = await exec('dbo.usp_Token_ListByMobile', r => r.input('Mobile', sql.VarChar(15), mobile));
+      return res.recordset.map(r => ({
+        tokenNo: r.TokenNo, dept: r.Department,
+        date: r.TokenDate?.toISOString?.().slice(0, 10) ?? r.TokenDate,
+        slot: r.Slot || null, status: r.Status,
+      }));
     },
 
     async saveConsult({ tokenId, doctorId, dx, rx, labs, dispo, notes }) {

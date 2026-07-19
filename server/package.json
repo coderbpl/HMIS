@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": { "node": ">=18" },
   "scripts": {
     "dev": "node src/index.js",
     "start": "NODE_ENV=production node src/index.js"

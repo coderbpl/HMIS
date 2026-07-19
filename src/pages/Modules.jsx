@@ -42,7 +42,7 @@ export function OpdQueue({ openConsult }) {
       <div className="sec-head" style={{ alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <div>
           <b style={{ fontSize: 16 }}>OPD queue</b>
-          <span> · Room 104 · Dr. Asha Verma {live ? '· live' : ''}</span>
+          <span> · Room 104 · Dr. Ravi Verma {live ? '· live' : ''}</span>
           {!live && <Pill tone="warn">offline demo</Pill>}
         </div>
         <div className="seg">

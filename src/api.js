@@ -73,6 +73,8 @@ export const api = {
   slots: (dept, date) => request(`/public/slots?dept=${encodeURIComponent(dept)}&date=${encodeURIComponent(date)}`, { auth: false }),
   trackToken: (mobile, tokenNo) => request('/public/track', { method: 'POST', auth: false, body: { mobile, tokenNo } }),
   selfToken: body => request('/public/self-token', { method: 'POST', auth: false, body }),
+  requestOtp: mobile => request('/public/otp/request', { method: 'POST', auth: false, body: { mobile } }),
+  myTokens: (mobile, otp) => request('/public/my-tokens', { method: 'POST', auth: false, body: { mobile, otp } }),
   checkIn: (mobile, tokenNo) => request('/public/check-in', { method: 'POST', auth: false, body: { mobile, tokenNo } }),
 
   // Medicines & Facilities

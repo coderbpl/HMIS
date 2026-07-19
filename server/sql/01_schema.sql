@@ -31,7 +31,8 @@ CREATE TABLE dbo.Departments (
 
 CREATE TABLE dbo.Patients (
   PatientId   INT           IDENTITY PRIMARY KEY,
-  PatientCode AS ('P-' + RIGHT('00000' + CAST(PatientId + 24000 AS VARCHAR(8)), 5)) PERSISTED,
+  -- Facility-scoped UHID (MP-BPL-DH01-26-00001), assigned by usp_Patient_Create.
+  PatientCode VARCHAR(24)   NOT NULL UNIQUE,
   FullName    NVARCHAR(120) NOT NULL,
   Mobile      VARCHAR(15)   NOT NULL,
   Age         INT           NOT NULL CHECK (Age BETWEEN 0 AND 130),
@@ -39,6 +40,7 @@ CREATE TABLE dbo.Patients (
   DeptId      TINYINT       NOT NULL REFERENCES dbo.Departments(DeptId),
   Abha        VARCHAR(20)   NULL,
   Scheme      NVARCHAR(40)  NULL,
+  FacilityCode VARCHAR(20)  NULL,   -- FK added after dbo.Facilities exists (see end of script)
   AllergiesJson  NVARCHAR(MAX) NOT NULL DEFAULT '[]',
   ConditionsJson NVARCHAR(MAX) NOT NULL DEFAULT '[]',
   MedsJson       NVARCHAR(MAX) NOT NULL DEFAULT '[]',
@@ -141,7 +143,18 @@ CREATE TABLE dbo.Facilities (
   FacilityCode VARCHAR(20)  PRIMARY KEY,
   Name         NVARCHAR(100) NOT NULL,
   Type         VARCHAR(30)   NOT NULL, -- District Hospital / PHC / CHC
-  Address      NVARCHAR(200) NOT NULL
+  Address      NVARCHAR(200) NOT NULL,
+  StateCode    CHAR(2)       NOT NULL DEFAULT 'MP',  -- feeds the UHID prefix
+  DistrictCode CHAR(3)       NOT NULL DEFAULT 'BPL',
+  ShortCode    CHAR(4)       NOT NULL DEFAULT 'DH01'
+);
+
+-- Per-facility, per-year UHID sequence: MP-BPL-DH01-26-00001
+CREATE TABLE dbo.UhidSequences (
+  FacilityCode VARCHAR(20) NOT NULL REFERENCES dbo.Facilities(FacilityCode),
+  Yr           CHAR(2)     NOT NULL,
+  LastSeq      INT         NOT NULL DEFAULT 0,
+  CONSTRAINT PK_UhidSeq PRIMARY KEY (FacilityCode, Yr)
 );
 
 CREATE TABLE dbo.Medicines (
@@ -271,3 +284,13 @@ INSERT INTO dbo.ConsultTemplates (DoctorId, Name, Category, IsSystemDefault, Com
  'Review with BP chart in 1 month.');
 GO
 
+
+-- Facility seed + FK for the UHID scheme (state → district → facility)
+INSERT INTO dbo.Facilities (FacilityCode, Name, Type, Address, StateCode, DistrictCode, ShortCode) VALUES
+ ('DIST_HOSP_01', N'District Hospital, Bhopal',            'District Hospital', N'Bhopal',      'MP', 'BPL', 'DH01'),
+ ('PHC_AHD_02',   N'Primary Health Centre, Anand Nagar',   'PHC',               N'Anand Nagar', 'MP', 'BPL', 'PH02'),
+ ('CHC_COL_03',   N'Community Health Centre, Kolar',       'CHC',               N'Kolar',       'MP', 'BPL', 'CH03');
+GO
+ALTER TABLE dbo.Patients ADD CONSTRAINT FK_Patients_Facility
+  FOREIGN KEY (FacilityCode) REFERENCES dbo.Facilities(FacilityCode);
+GO

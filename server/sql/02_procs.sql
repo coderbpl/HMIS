@@ -68,15 +68,37 @@ GO
 
 CREATE OR ALTER PROCEDURE dbo.usp_Patient_Create
   @FullName NVARCHAR(120), @Mobile VARCHAR(15), @Age INT, @Sex CHAR(1),
-  @Department NVARCHAR(60), @Abha VARCHAR(20) = NULL, @Scheme NVARCHAR(40) = NULL
+  @Department NVARCHAR(60), @Abha VARCHAR(20) = NULL, @Scheme NVARCHAR(40) = NULL,
+  @FacilityCode VARCHAR(20) = 'DIST_HOSP_01'
 AS
 BEGIN
   SET NOCOUNT ON;
+  SET XACT_ABORT ON;
   DECLARE @DeptId TINYINT = (SELECT DeptId FROM dbo.Departments WHERE Name = @Department);
   IF @DeptId IS NULL THROW 50001, 'Unknown department', 1;
 
-  INSERT INTO dbo.Patients (FullName, Mobile, Age, Sex, DeptId, Abha, Scheme)
-  VALUES (@FullName, @Mobile, @Age, @Sex, @DeptId, @Abha, @Scheme);
+  DECLARE @St CHAR(2), @Di CHAR(3), @Sh CHAR(4);
+  SELECT @St = StateCode, @Di = DistrictCode, @Sh = ShortCode
+  FROM dbo.Facilities WHERE FacilityCode = @FacilityCode;
+  IF @St IS NULL THROW 50006, 'Unknown facility', 1;
+
+  DECLARE @Yr CHAR(2) = RIGHT(CAST(YEAR(SYSUTCDATETIME()) AS CHAR(4)), 2);
+  DECLARE @Seq INT;
+
+  BEGIN TRAN;  -- atomic per-facility-per-year sequence => collision-free UHIDs
+    MERGE dbo.UhidSequences WITH (HOLDLOCK) AS tgt
+    USING (SELECT @FacilityCode AS FacilityCode, @Yr AS Yr) AS src
+      ON tgt.FacilityCode = src.FacilityCode AND tgt.Yr = src.Yr
+    WHEN MATCHED THEN UPDATE SET LastSeq = tgt.LastSeq + 1
+    WHEN NOT MATCHED THEN INSERT (FacilityCode, Yr, LastSeq) VALUES (src.FacilityCode, src.Yr, 1);
+    SELECT @Seq = LastSeq FROM dbo.UhidSequences WHERE FacilityCode = @FacilityCode AND Yr = @Yr;
+
+    DECLARE @Uhid VARCHAR(24) =
+      @St + '-' + @Di + '-' + @Sh + '-' + @Yr + '-' + RIGHT('00000' + CAST(@Seq AS VARCHAR(8)), 5);
+
+    INSERT INTO dbo.Patients (PatientCode, FullName, Mobile, Age, Sex, DeptId, Abha, Scheme, FacilityCode)
+    VALUES (@Uhid, @FullName, @Mobile, @Age, @Sex, @DeptId, @Abha, @Scheme, @FacilityCode);
+  COMMIT;
 
   SELECT p.PatientCode, p.FullName, p.Mobile, p.Age, p.Sex, d.Name AS Department,
          p.Abha, p.Scheme, p.AllergiesJson, p.ConditionsJson, p.MedsJson,
@@ -361,6 +383,10 @@ BEGIN
     THROW 50004, 'Invalid status transition', 1;
 
   BEGIN TRAN;
+    -- triage gate: vitals must be recorded before the doctor sees the patient
+    IF @NewStatus = 'in-consult' AND (SELECT VitalsDone FROM dbo.Tokens WHERE TokenId = @TokenId) = 0
+      THROW 50005, 'Vitals pending — patient must pass triage first', 1;
+
     IF @NewStatus = 'in-consult'  -- one consult at a time per department
       UPDATE dbo.Tokens SET Status = 'waiting'
       WHERE Status = 'in-consult' AND TokenId <> @TokenId
@@ -383,6 +409,24 @@ BEGIN
   JOIN dbo.Patients p ON p.PatientId = t.PatientId
   JOIN dbo.Departments d ON d.DeptId = t.DeptId
   WHERE t.TokenId = @TokenId;
+END;
+GO
+
+-- Recovery lookup: all live tokens for a mobile, today or upcoming.
+-- Only reachable through the API after OTP verification of that mobile.
+CREATE OR ALTER PROCEDURE dbo.usp_Token_ListByMobile @Mobile VARCHAR(15)
+AS
+BEGIN
+  SET NOCOUNT ON;
+  SELECT dbo.fn_DisplayToken(t.DeptId, t.SeqNo) AS TokenNo,
+         d.Name AS Department, t.TokenDate, t.SlotTime AS Slot, t.Status
+  FROM dbo.Tokens t
+  JOIN dbo.Patients p ON p.PatientId = t.PatientId
+  JOIN dbo.Departments d ON d.DeptId = t.DeptId
+  WHERE p.Mobile = @Mobile
+    AND t.TokenDate >= CAST(SYSUTCDATETIME() AS DATE)
+    AND t.Status <> 'cancelled'
+  ORDER BY t.TokenDate, t.SeqNo;
 END;
 GO
 

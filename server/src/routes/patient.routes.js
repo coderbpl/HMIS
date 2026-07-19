@@ -64,7 +64,8 @@ route({
   handler: async (req, res) => {
     const dam = getDam();
     const { issueToken, category, symptoms = [], complaint, feeAmount, feeExemption, ...fieldsIn } = req.body;
-    const patient = await dam.createPatient(fieldsIn);
+    // the operator's facility scopes the UHID (MP-BPL-DH01-26-00001)
+    const patient = await dam.createPatient({ ...fieldsIn, facilityCode: req.user.facilityCode });
     await dam.audit({ actorId: req.user.id, action: 'patient.create', entity: 'patient', entityId: patient.id });
     let token = null;
     if (issueToken !== 'no') {

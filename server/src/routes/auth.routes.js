@@ -32,7 +32,7 @@ route({
     username: z.string().regex(patterns.username, 'letters, digits and dots only'),
     password: z.string().min(1).max(128),
   }),
-  bodyExample: { username: 'dr.asha', password: 'Demo@1234' },
+  bodyExample: { username: 'dr.ravi', password: 'Demo@1234' },
   responses: {
     200: { description: 'Authenticated', schemaRef: 'AuthTokens' },
     401: { description: 'Bad credentials', schemaRef: 'Error', example: { error: 'Invalid username or password' } },
@@ -74,7 +74,7 @@ route({
   method: 'get', path: '/me',
   summary: 'Current authenticated identity',
   auth: { authenticated: true },
-  responses: { 200: { description: 'The caller', schemaRef: 'User', example: { id: 'U-1', name: 'Dr. Asha Verma', role: 'doctor' } } },
+  responses: { 200: { description: 'The caller', schemaRef: 'User', example: { id: 'U-1', name: 'Dr. Ravi Verma', role: 'doctor' } } },
   handler: async (req, res) => res.json(req.user),
 });
 

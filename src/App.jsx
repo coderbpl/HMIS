@@ -57,7 +57,10 @@ const TITLES = {
 };
 
 export default function App() {
-  const [roleKey, setRoleKey] = useState(null);
+  // Patient view survives the browser closing — staff sessions never do.
+  const [roleKey, setRoleKey] = useState(() => {
+    try { return localStorage.getItem('hmis.patientMode') ? 'patient' : null; } catch { return null; }
+  });
   const [page, setPage] = useState('dashboard');
   const [consultCtx, setConsultCtx] = useState(null);
   const [chartBed, setChartBed] = useState(null);
@@ -67,10 +70,10 @@ export default function App() {
     <Login
       onAuthed={user => { setOffline(false); setRoleKey(user.role); setPage('dashboard'); }}
       onOffline={rk => { setOffline(true); setRoleKey(rk); setPage('dashboard'); }}
-      onPatient={() => setRoleKey('patient')}
+      onPatient={() => { try { localStorage.setItem('hmis.patientMode', '1'); } catch { /* ignore */ } setRoleKey('patient'); }}
     />
   );
-  if (roleKey === 'patient') return <PatientPortal onExit={() => setRoleKey(null)} />;
+  if (roleKey === 'patient') return <PatientPortal onExit={() => { try { localStorage.removeItem('hmis.patientMode'); } catch { /* ignore */ } setRoleKey(null); }} />;
 
   const role = ROLES.find(r => r.key === roleKey);
   const nav = NAV[roleKey];

@@ -10,11 +10,16 @@ const { router, route } = createGatewayRouter('/api/queue', 'OPD Queue & Tokens'
 route({
   method: 'get', path: '/',
   summary: 'Staff queue with full patient details',
+  description: 'Doctors receive only triage-cleared tokens (vitals recorded) plus their in-consult patient — industry-standard OPD flow: arrive → triage → ready for doctor. Nurses and reception see the complete queue.',
   auth: { perm: 'queue:read' },
   query: z.object({ dept: z.string().max(60).optional() }),
   responses: { 200: { description: "Today's open tokens ordered by priority then sequence", schema: z.array(z.any()) } },
   handler: async (req, res) => {
-    res.json(await getDam().getQueueByDept(req.query.dept || null));
+    let rows = await getDam().getQueueByDept(req.query.dept || null);
+    if (req.user.role === 'doctor') {
+      rows = rows.filter(t => t.vitalsDone || t.status === 'in-consult');
+    }
+    res.json(rows);
   },
 });
 
