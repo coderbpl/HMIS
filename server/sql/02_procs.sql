@@ -293,11 +293,33 @@ CREATE OR ALTER PROCEDURE dbo.usp_Token_ExpireStale
 AS
 BEGIN
   SET NOCOUNT ON;
-  UPDATE dbo.Tokens SET Status = 'cancelled'
-  WHERE Status = 'booked' AND TokenDate = CAST(SYSUTCDATETIME() AS DATE)
-    AND DATEADD(MINUTE, 60,
-          ISNULL(CAST(CAST(TokenDate AS DATETIME2) AS DATETIME2)
-                 + CAST(SlotTime + ':00' AS TIME), IssuedAt)) < SYSUTCDATETIME();
+
+  DECLARE @Today DATE = CAST(SYSUTCDATETIME() AS DATE);
+
+  UPDATE dbo.Tokens
+  SET Status = 'cancelled'
+  WHERE Status = 'booked'
+    AND TokenDate = @Today
+    AND DATEADD
+    (
+      MINUTE,
+      60,
+      COALESCE
+      (
+        DATEADD
+        (
+          MINUTE,
+          DATEDIFF
+          (
+            MINUTE,
+            CAST('00:00' AS TIME),
+            TRY_CONVERT(TIME, SlotTime)
+          ),
+          CAST(TokenDate AS DATETIME2)
+        ),
+        IssuedAt
+      )
+    ) < SYSUTCDATETIME();
 END;
 GO
 
