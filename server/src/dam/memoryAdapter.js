@@ -242,7 +242,10 @@ export function createMemoryAdapter() {
       seq.uhid[key] = (seq.uhid[key] || 0) + 1;
       const uhid = `${fac.state}-${fac.district}-${fac.short}-${yy}-${String(seq.uhid[key]).padStart(5, '0')}`;
       const p = {
-        id: uhid, name, mobile, age: Number(age), sex,
+        id: uhid, name,
+        mobile: mobile || null,                                   // null for unknown emergency patients
+        age: age === null || age === undefined || age === '' ? null : Number(age),
+        sex,
         dept, abha: abha || null, scheme: scheme || null,
         facilityCode: fac.code,
         complaint: '', allergies: [], conditions: [], meds: [],
@@ -276,7 +279,8 @@ export function createMemoryAdapter() {
      * Without a name: first match (returning-patient quick path).
      */
     async getPatientByMobile(mobile, name = null) {
-      const matches = db.patients.filter(p => String(p.mobile) === String(mobile));
+      if (!mobile) return null; // never match the null mobiles of unknown emergency patients
+      const matches = db.patients.filter(p => p.mobile && String(p.mobile) === String(mobile));
       if (!name) return matches[0] || null;
       const norm = String(name).trim().toLowerCase().replace(/\s+/g, ' ');
       return matches.find(p => p.name.trim().toLowerCase().replace(/\s+/g, ' ') === norm) || null;
@@ -450,7 +454,8 @@ export function createMemoryAdapter() {
       }
       if (status === 'in-consult') {
         // triage gate: no patient reaches the doctor before vitals are recorded
-        if (!t.vitalsDone) {
+        // (emergencies bypass — treatment first, paperwork later)
+        if (!t.vitalsDone && t.category !== 'emergency') {
           throw Object.assign(new Error(`Vitals pending for ${t.tokenNo} — patient must pass triage first`), { status: 409 });
         }
         // one patient in consult per department at a time

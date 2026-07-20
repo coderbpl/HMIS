@@ -410,7 +410,9 @@ BEGIN
 
   BEGIN TRAN;
     -- triage gate: vitals must be recorded before the doctor sees the patient
-    IF @NewStatus = 'in-consult' AND (SELECT VitalsDone FROM dbo.Tokens WHERE TokenId = @TokenId) = 0
+    -- (emergency category bypasses — treatment first, paperwork later)
+    IF @NewStatus = 'in-consult' AND EXISTS (
+      SELECT 1 FROM dbo.Tokens WHERE TokenId = @TokenId AND VitalsDone = 0 AND Category <> 'emergency')
       THROW 50005, 'Vitals pending — patient must pass triage first', 1;
 
     IF @NewStatus = 'in-consult'  -- one consult at a time per department

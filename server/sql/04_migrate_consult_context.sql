@@ -37,6 +37,15 @@ IF EXISTS (SELECT 1 FROM sys.columns
   ALTER TABLE dbo.Consults ALTER COLUMN Diagnosis NVARCHAR(400) NULL;
 GO
 
+-- ---------- Emergency admissions: unidentified patients have no mobile/age ----------
+IF EXISTS (SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID('dbo.Patients') AND name = 'Mobile' AND is_nullable = 0)
+  ALTER TABLE dbo.Patients ALTER COLUMN Mobile VARCHAR(15) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns
+           WHERE object_id = OBJECT_ID('dbo.Patients') AND name = 'Age' AND is_nullable = 0)
+  ALTER TABLE dbo.Patients ALTER COLUMN Age INT NULL;
+GO
+
 -- ---------- Vitals: height (BMI) if missing ----------
 IF COL_LENGTH('dbo.Vitals', 'Height') IS NULL
   ALTER TABLE dbo.Vitals ADD Height DECIMAL(5,1) NULL;
@@ -104,6 +113,55 @@ BEGIN
   JOIN dbo.Tokens t ON t.TokenId = c.TokenId
   JOIN dbo.Departments d ON d.DeptId = t.DeptId
   WHERE c.ConsultId = @ConsultId;
+END;
+GO
+
+-- ---------- updated status proc: emergency bypasses the triage gate ----------
+CREATE OR ALTER PROCEDURE dbo.usp_Token_UpdateStatus
+  @TokenRef VARCHAR(16), @NewStatus VARCHAR(12), @ActorRef VARCHAR(16)
+AS
+BEGIN
+  SET NOCOUNT ON;
+  SET XACT_ABORT ON;
+  DECLARE @TokenId INT = TRY_CAST(@TokenRef AS INT);
+  DECLARE @Old VARCHAR(12) = (SELECT Status FROM dbo.Tokens WHERE TokenId = @TokenId);
+  IF @Old IS NULL THROW 50003, 'Token not found', 1;
+
+  -- allowed transitions only
+  IF NOT ( (@Old = 'checked-in' AND @NewStatus = 'waiting')
+        OR (@Old = 'waiting'    AND @NewStatus IN ('in-consult','checked-in'))
+        OR (@Old = 'in-consult' AND @NewStatus IN ('done','waiting')) )
+    THROW 50004, 'Invalid status transition', 1;
+
+  BEGIN TRAN;
+    -- triage gate: vitals must be recorded before the doctor sees the patient
+    -- (emergency category bypasses — treatment first, paperwork later)
+    IF @NewStatus = 'in-consult' AND EXISTS (
+      SELECT 1 FROM dbo.Tokens WHERE TokenId = @TokenId AND VitalsDone = 0 AND Category <> 'emergency')
+      THROW 50005, 'Vitals pending — patient must pass triage first', 1;
+
+    IF @NewStatus = 'in-consult'  -- one consult at a time per department
+      UPDATE dbo.Tokens SET Status = 'waiting'
+      WHERE Status = 'in-consult' AND TokenId <> @TokenId
+        AND DeptId = (SELECT DeptId FROM dbo.Tokens WHERE TokenId = @TokenId)
+        AND TokenDate = CAST(SYSUTCDATETIME() AS DATE);
+
+    UPDATE dbo.Tokens
+    SET Status = @NewStatus,
+        CalledAt = CASE WHEN @NewStatus = 'in-consult' THEN SYSUTCDATETIME() ELSE CalledAt END
+    WHERE TokenId = @TokenId;
+
+    INSERT INTO dbo.AuditLog (ActorId, Action, Entity, EntityRef, Detail)
+    VALUES (TRY_CAST(@ActorRef AS INT), 'token.status', 'token', @TokenRef, @NewStatus);
+  COMMIT;
+
+  SELECT t.TokenId, dbo.fn_DisplayToken(t.DeptId, t.SeqNo) AS TokenNo,
+         p.PatientCode, d.Name AS Department, t.TokenDate, t.Status, t.Priority,
+         t.VitalsDone, t.IssuedAt, t.CalledAt
+  FROM dbo.Tokens t
+  JOIN dbo.Patients p ON p.PatientId = t.PatientId
+  JOIN dbo.Departments d ON d.DeptId = t.DeptId
+  WHERE t.TokenId = @TokenId;
 END;
 GO
 

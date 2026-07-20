@@ -17,7 +17,8 @@ route({
   handler: async (req, res) => {
     let rows = await getDam().getQueueByDept(req.query.dept || null);
     if (req.user.role === 'doctor') {
-      rows = rows.filter(t => t.vitalsDone || t.status === 'in-consult');
+      // emergencies bypass triage — treatment first, paperwork later
+      rows = rows.filter(t => t.vitalsDone || t.status === 'in-consult' || t.category === 'emergency');
     }
     res.json(rows);
   },

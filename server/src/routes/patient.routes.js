@@ -39,11 +39,14 @@ route({
   summary: 'Register a patient (optionally issuing an OPD token)',
   description: 'Front-desk registration. When issueToken is not "no", a queue token for the chosen department is issued in the same call and the live boards update instantly.',
   auth: { perm: 'patients:register' },
+  // Emergency admissions are treatment-first: an unconscious or unidentified
+  // patient has no mobile/age/ABHA yet, so those become optional for
+  // category=emergency and stay mandatory for normal/referral registration.
   body: z.object({
-    name: z.string().min(2).max(120),
-    mobile: fields.mobile,
-    age: fields.age,
-    sex: fields.sex,
+    name: z.string().min(2).max(120).optional(),
+    mobile: fields.mobile.optional().or(z.literal('')),
+    age: fields.age.optional(),
+    sex: fields.sex.default('O'),
     dept: fields.dept,
     abha: fields.abha.optional(),
     scheme: z.string().max(40).optional(),
@@ -53,6 +56,12 @@ route({
     complaint: z.string().max(200).optional(),
     feeAmount: z.coerce.number().int().min(0).max(10000).optional(),
     feeExemption: z.string().max(30).optional(),
+  }).superRefine((b, ctx) => {
+    if (b.category !== 'emergency') {
+      if (!b.name) ctx.addIssue({ code: 'custom', path: ['name'], message: 'name is required' });
+      if (!b.mobile) ctx.addIssue({ code: 'custom', path: ['mobile'], message: 'a valid 10-digit mobile is required' });
+      if (b.age === undefined) ctx.addIssue({ code: 'custom', path: ['age'], message: 'age is required' });
+    }
   }),
   bodyExample: { name: 'Geeta Bai', mobile: '9822334455', age: 38, sex: 'F', dept: 'General Medicine', symptoms: ['fever'], feeAmount: 10 },
   responses: {
@@ -64,6 +73,12 @@ route({
   handler: async (req, res) => {
     const dam = getDam();
     const { issueToken, category, symptoms = [], complaint, feeAmount, feeExemption, ...fieldsIn } = req.body;
+    if (category === 'emergency') {
+      // unknown-patient defaults — identity is completed later at the counter
+      fieldsIn.name = fieldsIn.name || 'Unknown patient';
+      fieldsIn.mobile = fieldsIn.mobile || null;
+      fieldsIn.age = fieldsIn.age ?? null;
+    }
     // the operator's facility scopes the UHID (MP-BPL-DH01-26-00001)
     const patient = await dam.createPatient({ ...fieldsIn, facilityCode: req.user.facilityCode });
     await dam.audit({ actorId: req.user.id, action: 'patient.create', entity: 'patient', entityId: patient.id });

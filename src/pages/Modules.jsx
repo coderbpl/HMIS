@@ -151,19 +151,28 @@ export function Register() {
   const submit = async (e) => {
     e.preventDefault();
     setErr(''); setResult(null);
-    if (!f.name.trim() || !/^[6-9]\d{9}$/.test(f.mobile) || f.age === '') {
+    const isEmergency = catValue(category) === 'emergency';
+    // emergency = treatment first: register with whatever is known
+    if (!isEmergency && (!f.name.trim() || !/^[6-9]\d{9}$/.test(f.mobile) || f.age === '')) {
       setErr('Name, a valid 10-digit mobile and age are required.');
+      return;
+    }
+    if (isEmergency && f.mobile && !/^[6-9]\d{9}$/.test(f.mobile)) {
+      setErr('Mobile must be 10 digits — or leave it blank if unknown.');
       return;
     }
     setBusy(true);
     try {
       const feeOpt = FEE_OPTIONS.find(o => o.label === fee) || FEE_OPTIONS[0];
       const res = await api.registerPatient({
-        name: f.name.trim(), mobile: f.mobile, age: Number(f.age), sex: f.sex,
+        name: f.name.trim() || undefined,
+        mobile: f.mobile || undefined,
+        age: f.age === '' ? undefined : Number(f.age),
+        sex: f.sex,
         dept: f.dept, abha: f.abha || undefined, scheme: f.scheme || undefined, issueToken: 'yes',
         category: catValue(category),
         symptoms: symptomList.filter(s => symptoms.includes(symLabel(s))).map(s => s.code),
-        feeAmount: feeOpt.feeAmount, feeExemption: feeOpt.feeExemption || undefined,
+        ...(isEmergency ? {} : { feeAmount: feeOpt.feeAmount, feeExemption: feeOpt.feeExemption || undefined }),
       });
       setResult(res);
       setF(empty); setSymptoms([]); setCategory(CATEGORIES[0]); setFee(FEE_OPTIONS[0].label); setDeptTouched(false);
@@ -183,15 +192,15 @@ export function Register() {
         </div>
         {catValue(category) === 'emergency' && (
           <div className="offline-band" style={{ background: '#FBE5E3', borderColor: '#F2B8B3', color: '#A02E24' }}>
-            Emergency — token issued as <b>urgent</b>. Send the patient to ER triage immediately; paperwork can follow.
+            Emergency — token issued as <b>urgent</b>, straight to the doctor (triage bypassed). Name, mobile and age are optional; fee is waived for now — complete the record once the patient is stable.
           </div>
         )}
         <div className="f-row">
-          <div className="f-group"><label className="f-label">Full name *</label><input className="f-inp" placeholder="As per ID document" value={f.name} onChange={set('name')} /></div>
-          <div className="f-group"><label className="f-label">Mobile number *</label><input className="f-inp" inputMode="numeric" placeholder="10 digits" value={f.mobile} onChange={e => setF(x => ({ ...x, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) }))} /></div>
+          <div className="f-group"><label className="f-label">Full name {catValue(category) === 'emergency' ? <em>(if known)</em> : '*'}</label><input className="f-inp" placeholder={catValue(category) === 'emergency' ? 'Unknown if unidentified' : 'As per ID document'} value={f.name} onChange={set('name')} /></div>
+          <div className="f-group"><label className="f-label">Mobile number {catValue(category) === 'emergency' ? <em>(if known)</em> : '*'}</label><input className="f-inp" inputMode="numeric" placeholder="10 digits" value={f.mobile} onChange={e => setF(x => ({ ...x, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) }))} /></div>
         </div>
         <div className="f-row3">
-          <div className="f-group"><label className="f-label">Age *</label><input className="f-inp" inputMode="numeric" placeholder="Years" value={f.age} onChange={e => setF(x => ({ ...x, age: e.target.value.replace(/\D/g, '').slice(0, 3) }))} /></div>
+          <div className="f-group"><label className="f-label">Age {catValue(category) === 'emergency' ? <em>(approx.)</em> : '*'}</label><input className="f-inp" inputMode="numeric" placeholder="Years" value={f.age} onChange={e => setF(x => ({ ...x, age: e.target.value.replace(/\D/g, '').slice(0, 3) }))} /></div>
           <div className="f-group"><label className="f-label">Sex *</label><select className="f-sel" value={f.sex} onChange={set('sex')}><option value="F">Female</option><option value="M">Male</option><option value="O">Other</option></select></div>
           <div className="f-group"><label className="f-label">Scheme</label><select className="f-sel" value={f.scheme} onChange={set('scheme')}><option value="">None / Cash</option><option>Ayushman Bharat</option><option>JSY</option><option>State employee</option></select></div>
         </div>

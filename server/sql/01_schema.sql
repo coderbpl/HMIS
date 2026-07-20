@@ -34,8 +34,8 @@ CREATE TABLE dbo.Patients (
   -- Facility-scoped UHID (MP-BPL-DH01-26-00001), assigned by usp_Patient_Create.
   PatientCode VARCHAR(24)   NOT NULL UNIQUE,
   FullName    NVARCHAR(120) NOT NULL,
-  Mobile      VARCHAR(15)   NOT NULL,
-  Age         INT           NOT NULL CHECK (Age BETWEEN 0 AND 130),
+  Mobile      VARCHAR(15)   NULL,     -- NULL for unidentified emergency admissions
+  Age         INT           NULL CHECK (Age BETWEEN 0 AND 130),
   Sex         CHAR(1)       NOT NULL CHECK (Sex IN ('M','F','O')),
   DeptId      TINYINT       NOT NULL REFERENCES dbo.Departments(DeptId),
   Abha        VARCHAR(20)   NULL,
