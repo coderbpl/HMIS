@@ -76,6 +76,8 @@ export const api = {
   requestOtp: mobile => request('/public/otp/request', { method: 'POST', auth: false, body: { mobile } }),
   myTokens: (mobile, otp) => request('/public/my-tokens', { method: 'POST', auth: false, body: { mobile, otp } }),
   checkIn: (mobile, tokenNo) => request('/public/check-in', { method: 'POST', auth: false, body: { mobile, tokenNo } }),
+  prepone: (mobile, tokenNo) => request('/public/prepone', { method: 'POST', auth: false, body: { mobile, tokenNo } }),
+  returnToTriage: id => request(`/queue/tokens/${encodeURIComponent(id)}/triage-return`, { method: 'PATCH' }),
 
   // Medicines & Facilities
   getFacilities: () => request('/medicines/facilities'),

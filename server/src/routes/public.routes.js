@@ -162,6 +162,29 @@ route({
 });
 
 route({
+  method: 'post', path: '/prepone',
+  summary: 'Move a future booking to today',
+  description: "Plans changed — the patient came early. Cancels the advance booking and issues a fresh token in today's series for the same department. Requires mobile + token number together. The new token follows the normal self-service flow (check in on arrival).",
+  auth: false,
+  middleware: [trackLimiter],
+  body: z.object({ mobile: fields.mobile, tokenNo: fields.tokenNo }),
+  bodyExample: { mobile: '9891234567', tokenNo: 'B-03' },
+  responses: {
+    200: { description: "Rebooked into today's queue", example: { tokenNo: 'B-05', dept: 'Pediatrics', status: 'booked', date: '2026-07-19' } },
+    403: { description: 'Mobile does not match the booking', schemaRef: 'Error' },
+    404: { description: 'No upcoming booking with that number', schemaRef: 'Error' },
+    409: { description: 'Already holds a token for today', schemaRef: 'Error' },
+  },
+  handler: async (req, res) => {
+    const token = await getDam().preponeToken(req.body);
+    await getCache().del(`pubqueue:${token.dept}`);
+    await getCache().del('pubqueue:null');
+    emitQueueChange(token.dept);
+    res.json({ tokenNo: token.tokenNo, dept: token.dept, status: token.status, date: token.date, slot: token.slot || null });
+  },
+});
+
+route({
   method: 'post', path: '/track',
   summary: 'Track my token (mobile + token number)',
   description: 'Both identifiers must match the record — a token number alone reveals nothing. POST body, never URL parameters, so no PHI lands in access logs.',
@@ -287,14 +310,20 @@ route({
         return res.status(403).json({ error: 'Mobile number does not match the ABHA record', correlationId: req.id });
       }
     } else {
-      patient = await dam.getPatientByMobile(mobile);
+      // Families share one mobile: a typed name selects the matching family
+      // member's record; an unknown name registers a NEW patient rather than
+      // hijacking (and mis-greeting) whoever registered that mobile first.
+      patient = await dam.getPatientByMobile(mobile, name || null);
       if (!patient) {
         if (!name || age === undefined || !sex || !targetDept) {
-          return res.status(422).json({ error: 'First visit? Name, age, sex and a symptom are needed to register you', correlationId: req.id });
+          const anyOnMobile = await dam.getPatientByMobile(mobile);
+          if (anyOnMobile && !name) patient = anyOnMobile; // returning patient, no name typed
+          else return res.status(422).json({ error: 'First visit? Name, age, sex and a symptom are needed to register you', correlationId: req.id });
+        } else {
+          // portal deployments are per-facility; self-registrations take the host facility's UHID series
+          patient = await dam.createPatient({ name, mobile, age, sex, dept: targetDept, facilityCode: process.env.FACILITY_CODE || 'DIST_HOSP_01' });
+          await dam.audit({ actorId: null, action: 'patient.self-register', entity: 'patient', entityId: patient.id });
         }
-        // portal deployments are per-facility; self-registrations take the host facility's UHID series
-        patient = await dam.createPatient({ name, mobile, age, sex, dept: targetDept, facilityCode: process.env.FACILITY_CODE || 'DIST_HOSP_01' });
-        await dam.audit({ actorId: null, action: 'patient.self-register', entity: 'patient', entityId: patient.id });
       }
     }
     targetDept = targetDept || patient.dept || 'General Medicine';

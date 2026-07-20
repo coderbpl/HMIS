@@ -58,6 +58,18 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
   const [famRelation, setFamRelation] = useState(null);
   const [famCondition, setFamCondition] = useState(null);
   const [dx, setDx] = useState('');   // kept for template compatibility
+  // send back to triage (vitals missing / stale / implausible)
+  const [triageBusy, setTriageBusy] = useState(false);
+  const [triageErr, setTriageErr] = useState('');
+  const sendBackToTriage = async () => {
+    setTriageErr(''); setTriageBusy(true);
+    try {
+      if (tokenId && api.online) await api.returnToTriage(tokenId);
+      onClose();
+    } catch (err) {
+      setTriageErr(err.offline ? 'API unreachable — could not return the token.' : err.message);
+    } finally { setTriageBusy(false); }
+  };
   const [rx, setRx] = useState([]);
   const [labs, setLabs] = useState(['ECG', 'CBC']);
   const [dispo, setDispo] = useState('home');
@@ -342,6 +354,16 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
             <div><b>Out-of-range values flagged</b><span>Review SpO₂ / temperature before disposition.</span></div>
           </div>
         )}
+        <div style={{ display: 'flex', gap: 10, marginTop: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button type="button" className={`btn ${!p.bp && !p.pulse ? 'primary' : 'ghost'}`} disabled={triageBusy}
+            onClick={sendBackToTriage}>
+            <Icon name="back" size={14} /> {triageBusy ? 'Sending…' : 'Send back to nurse for vitals'}
+          </button>
+          <span className="hint" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+            Returns the token to the triage queue — it reappears here once re-charted.
+          </span>
+        </div>
+        {triageErr && <div className="offline-band" style={{ marginTop: 10, background: '#FBE5E3', borderColor: '#F2B8B3', color: '#A02E24' }}>{triageErr}</div>}
       </div>
     ),
     allergy: (

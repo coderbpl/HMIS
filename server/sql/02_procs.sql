@@ -161,7 +161,7 @@ BEGIN
 END;
 GO
 
-CREATE OR ALTER PROCEDURE dbo.usp_Patient_GetByMobile @Mobile VARCHAR(15)
+CREATE OR ALTER PROCEDURE dbo.usp_Patient_GetByMobile @Mobile VARCHAR(15), @FullName NVARCHAR(120) = NULL
 AS
 BEGIN
   SET NOCOUNT ON;
@@ -171,6 +171,7 @@ BEGIN
          NULL AS Bp, NULL AS Pulse, NULL AS Temp, NULL AS Spo2, NULL AS Rr, NULL AS Weight
   FROM dbo.Patients p JOIN dbo.Departments d ON d.DeptId = p.DeptId
   WHERE p.Mobile = @Mobile
+    AND (@FullName IS NULL OR LOWER(LTRIM(RTRIM(p.FullName))) = LOWER(LTRIM(RTRIM(@FullName))))
   ORDER BY p.CreatedAt DESC;
 END;
 GO
@@ -476,9 +477,25 @@ BEGIN
   JOIN dbo.Departments d ON d.DeptId = t.DeptId
   LEFT JOIN dbo.Prescriptions pr ON pr.TokenId = t.TokenId
   WHERE t.TokenDate >= CAST(SYSUTCDATETIME() AS DATE)
+    AND t.Status <> 'cancelled'
     AND p.Mobile = @Mobile
     AND dbo.fn_DisplayToken(t.DeptId, t.SeqNo) = UPPER(@TokenNo)
   ORDER BY t.TokenDate;
+END;
+GO
+
+-- Union-merge two JSON string arrays: '["a"]' + '["a","b"]' -> '["a","b"]'
+CREATE OR ALTER FUNCTION dbo.fn_MergeJsonArray (@A NVARCHAR(MAX), @B NVARCHAR(MAX))
+RETURNS NVARCHAR(MAX)
+AS
+BEGIN
+  IF @B IS NULL OR @B = '' OR @B = '[]' RETURN ISNULL(@A, '[]');
+  RETURN ISNULL((
+    SELECT '[' + STRING_AGG('"' + STRING_ESCAPE(v, 'json') + '"', ',') + ']'
+    FROM (SELECT DISTINCT value AS v
+          FROM (SELECT value FROM OPENJSON(ISNULL(@A, '[]'))
+                UNION SELECT value FROM OPENJSON(@B)) u) d
+  ), '[]');
 END;
 GO
 
@@ -487,7 +504,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_Consult_Save
   @RxJson NVARCHAR(MAX), @LabsJson NVARCHAR(MAX),
   @Disposition VARCHAR(12), @Notes NVARCHAR(MAX),
   @AllergiesJson NVARCHAR(MAX) = NULL, @FoodAllergiesJson NVARCHAR(MAX) = NULL,
-  @BloodGroup VARCHAR(7) = NULL, @FamilyJson NVARCHAR(MAX) = NULL
+  @BloodGroup VARCHAR(7) = NULL, @FamilyJson NVARCHAR(MAX) = NULL,
+  @PastIllnessJson NVARCHAR(MAX) = NULL, @SocialJson NVARCHAR(MAX) = NULL
 AS
 BEGIN
   SET NOCOUNT ON;
@@ -504,12 +522,15 @@ BEGIN
 
     UPDATE dbo.Tokens SET Status = 'done' WHERE TokenId = @TokenId;
 
-    -- clinical context recorded in-consult persists on the patient record
+    -- clinical context recorded in-consult persists on the patient record;
+    -- list fields are union-merged so a later consult never erases history
     UPDATE dbo.Patients SET
-      AllergiesJson     = COALESCE(@AllergiesJson, AllergiesJson),
-      FoodAllergiesJson = COALESCE(@FoodAllergiesJson, FoodAllergiesJson),
+      AllergiesJson     = dbo.fn_MergeJsonArray(AllergiesJson, @AllergiesJson),
+      FoodAllergiesJson = dbo.fn_MergeJsonArray(FoodAllergiesJson, @FoodAllergiesJson),
+      ConditionsJson    = dbo.fn_MergeJsonArray(ConditionsJson, @PastIllnessJson),
       BloodGroup        = COALESCE(@BloodGroup, BloodGroup),
-      FamilyJson        = COALESCE(@FamilyJson, FamilyJson)
+      FamilyJson        = COALESCE(@FamilyJson, FamilyJson),
+      SocialJson        = COALESCE(@SocialJson, SocialJson)
     WHERE PatientId = @PatientId;
 
     -- Create Prescription if RxJson has items
@@ -795,3 +816,65 @@ BEGIN
 END;
 GO
 
+
+-- Doctor sends the patient back to nursing triage (vitals wiped).
+CREATE OR ALTER PROCEDURE dbo.usp_Token_ReturnToTriage
+  @TokenRef VARCHAR(16), @ActorRef VARCHAR(16)
+AS
+BEGIN
+  SET NOCOUNT ON;
+  SET XACT_ABORT ON;
+  DECLARE @TokenId INT = TRY_CAST(@TokenRef AS INT);
+  DECLARE @Old VARCHAR(12) = (SELECT Status FROM dbo.Tokens WHERE TokenId = @TokenId);
+  IF @Old IS NULL THROW 50003, 'Token not found', 1;
+  IF @Old NOT IN ('waiting','in-consult') THROW 50007, 'Cannot send this token back to triage', 1;
+
+  BEGIN TRAN;
+    UPDATE dbo.Tokens SET Status = 'waiting', VitalsDone = 0 WHERE TokenId = @TokenId;
+    INSERT INTO dbo.AuditLog (ActorId, Action, Entity, EntityRef, Detail)
+    VALUES (TRY_CAST(@ActorRef AS INT), 'token.triage-return', 'token', @TokenRef, NULL);
+  COMMIT;
+
+  SELECT t.TokenId, dbo.fn_DisplayToken(t.DeptId, t.SeqNo) AS TokenNo,
+         p.PatientCode, d.Name AS Department, t.TokenDate, t.Status, t.Priority,
+         t.VitalsDone, t.IssuedAt, t.CalledAt
+  FROM dbo.Tokens t
+  JOIN dbo.Patients p ON p.PatientId = t.PatientId
+  JOIN dbo.Departments d ON d.DeptId = t.DeptId
+  WHERE t.TokenId = @TokenId;
+END;
+GO
+
+-- Future self-service booking moved to today's queue (old token cancelled).
+CREATE OR ALTER PROCEDURE dbo.usp_Token_Prepone
+  @Mobile VARCHAR(15), @TokenNo VARCHAR(8)
+AS
+BEGIN
+  SET NOCOUNT ON;
+  SET XACT_ABORT ON;
+  DECLARE @Today DATE = CAST(SYSUTCDATETIME() AS DATE);
+
+  DECLARE @TokenId INT, @PatientId INT, @DeptId TINYINT, @Priority VARCHAR(10),
+          @Category VARCHAR(10), @Complaint NVARCHAR(200), @PatientCode VARCHAR(24), @DeptName NVARCHAR(60);
+  SELECT TOP 1 @TokenId = t.TokenId, @PatientId = t.PatientId, @DeptId = t.DeptId,
+         @Priority = t.Priority, @Category = t.Category, @Complaint = t.Complaint,
+         @PatientCode = p.PatientCode, @DeptName = d.Name
+  FROM dbo.Tokens t
+  JOIN dbo.Patients p ON p.PatientId = t.PatientId
+  JOIN dbo.Departments d ON d.DeptId = t.DeptId
+  WHERE dbo.fn_DisplayToken(t.DeptId, t.SeqNo) = UPPER(@TokenNo)
+    AND t.TokenDate > @Today AND t.Status = 'booked' AND p.Mobile = @Mobile
+  ORDER BY t.TokenDate;
+  IF @TokenId IS NULL THROW 50008, 'No upcoming booking with that token number and mobile', 1;
+
+  BEGIN TRAN;
+    UPDATE dbo.Tokens SET Status = 'cancelled' WHERE TokenId = @TokenId;
+    INSERT INTO dbo.AuditLog (ActorId, Action, Entity, EntityRef, Detail)
+    VALUES (NULL, 'token.prepone', 'token', CAST(@TokenId AS VARCHAR(16)), UPPER(@TokenNo));
+  COMMIT;
+
+  -- reissue in today's series (usp_Token_Issue serializes the sequence)
+  EXEC dbo.usp_Token_Issue @PatientCode = @PatientCode, @Department = @DeptName,
+       @Priority = @Priority, @Category = @Category, @Source = 'self', @Complaint = @Complaint;
+END;
+GO

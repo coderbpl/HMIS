@@ -65,6 +65,25 @@ route({
 });
 
 route({
+  method: 'patch', path: '/tokens/:id/triage-return',
+  summary: 'Send the patient back to nursing triage',
+  description: "Doctor's escape hatch when vitals are missing, stale, or implausible: wipes the vitals flag and returns the token to the triage queue, removing it from the doctor's list until the nurse re-records.",
+  auth: { perm: 'queue:call' },
+  params: z.object({ id: fields.id }),
+  responses: {
+    200: { description: 'Token back in triage', schemaRef: 'Token' },
+    404: { description: 'Unknown token', schemaRef: 'Error' },
+    409: { description: 'Token is not in a state that can return to triage', schemaRef: 'Error' },
+  },
+  handler: async (req, res) => {
+    const token = await getDam().returnToTriage(req.params.id, req.user.id);
+    await getCache().del(`pubqueue:${token.dept}`);
+    emitQueueChange(token.dept);
+    res.json(token);
+  },
+});
+
+route({
   method: 'patch', path: '/tokens/:id/vitals',
   summary: 'Record triage vitals for a token',
   description: 'Nurse triage capture. Values outside plausible clinical ranges are rejected. Marks the token vitals-done, which the doctor queue and the patient portal reflect immediately.',

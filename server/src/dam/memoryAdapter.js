@@ -51,7 +51,7 @@ export function createMemoryAdapter() {
     consultTemplates: [],
     prescriptions: []
   };
-  let seq = { patient: 24076, token: 0, consult: 0, template: 0, prescription: 0, uhid: {} };
+  let seq = { patient: 24076, token: 0, consult: 0, template: 0, prescription: 1, uhid: {} }; // PR-1 is seeded
   const today = () => new Date().toISOString().slice(0, 10);
 
   const seedPatient = (p) => { db.patients.push(p); return p; };
@@ -269,8 +269,17 @@ export function createMemoryAdapter() {
       return db.patients.find(p => p.abha && p.abha.replace(/\D/g, '') === norm) || null;
     },
 
-    async getPatientByMobile(mobile) {
-      return db.patients.find(p => String(p.mobile) === String(mobile)) || null;
+    /**
+     * Families share one mobile, so a mobile can map to several patients.
+     * With a name: return the same-mobile patient whose name matches
+     * (case-insensitive), or null so the caller registers a new record.
+     * Without a name: first match (returning-patient quick path).
+     */
+    async getPatientByMobile(mobile, name = null) {
+      const matches = db.patients.filter(p => String(p.mobile) === String(mobile));
+      if (!name) return matches[0] || null;
+      const norm = String(name).trim().toLowerCase().replace(/\s+/g, ' ');
+      return matches.find(p => p.name.trim().toLowerCase().replace(/\s+/g, ' ') === norm) || null;
     },
 
     async saveVitals(tokenId, vitals, actorId) {
@@ -380,6 +389,41 @@ export function createMemoryAdapter() {
       return t;
     },
 
+    /** Doctor sends the patient back to nursing: vitals wiped, token returns
+     *  to the triage queue and leaves the doctor's list. */
+    async returnToTriage(tokenId, actorId) {
+      const t = db.tokens.find(x => x.id === tokenId || x.tokenNo === tokenId);
+      if (!t) throw Object.assign(new Error('Token not found'), { status: 404 });
+      if (!['waiting', 'in-consult'].includes(t.status)) {
+        throw Object.assign(new Error(`Cannot send a ${t.status} token back to triage`), { status: 409 });
+      }
+      t.status = 'waiting';
+      t.vitalsDone = false;
+      await this.audit({ actorId, action: 'token.triage-return', entity: 'token', entityId: t.id, detail: t.tokenNo });
+      return { ...t, patient: db.patients.find(p => p.id === t.patientId) || null };
+    },
+
+    /** Advance booking → today: cancels the future token and issues a fresh
+     *  one in today's series (same dept). Mobile must match the booking. */
+    async preponeToken({ mobile, tokenNo }) {
+      this.expireStaleBookings();
+      const t = db.tokens.find(x =>
+        x.tokenNo.toUpperCase() === String(tokenNo).toUpperCase() &&
+        x.date > today() && x.status === 'booked');
+      if (!t) throw Object.assign(new Error('No upcoming booking with that token number'), { status: 404 });
+      const p = db.patients.find(x => x.id === t.patientId);
+      if (!p || String(p.mobile) !== String(mobile)) {
+        throw Object.assign(new Error('Mobile number does not match this booking'), { status: 403 });
+      }
+      const fresh = await this.issueToken({
+        patientId: t.patientId, dept: t.dept, priority: t.priority,
+        category: t.category, source: 'self', complaint: t.complaint,
+      });
+      t.status = 'cancelled';
+      await this.audit({ actorId: null, action: 'token.prepone', entity: 'token', entityId: fresh.id, detail: `${t.tokenNo} (${t.date}) → ${fresh.tokenNo} today` });
+      return fresh;
+    },
+
     async getPublicQueue(dept) {
       // booked-but-not-arrived tokens stay off the public board
       const rows = (await this.getQueueByDept(dept)).filter(t => t.status !== 'booked');
@@ -423,7 +467,7 @@ export function createMemoryAdapter() {
       this.expireStaleBookings();
       // today's token first, else the nearest future booking with that number
       const matches = db.tokens
-        .filter(x => x.date >= today() && x.tokenNo.toUpperCase() === String(tokenNo).toUpperCase())
+        .filter(x => x.date >= today() && x.status !== 'cancelled' && x.tokenNo.toUpperCase() === String(tokenNo).toUpperCase())
         .sort((a, b) => a.date.localeCompare(b.date));
       const t = matches[0];
       if (!t) return null;

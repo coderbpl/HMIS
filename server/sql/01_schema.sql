@@ -45,6 +45,7 @@ CREATE TABLE dbo.Patients (
   AllergiesJson  NVARCHAR(MAX) NOT NULL DEFAULT '[]',
   FoodAllergiesJson NVARCHAR(MAX) NOT NULL DEFAULT '[]',
   FamilyJson     NVARCHAR(MAX) NOT NULL DEFAULT '[]',   -- [{relation, condition}]
+  SocialJson     NVARCHAR(MAX) NOT NULL DEFAULT '[]',   -- smoking / alcohol / tobacco …
   ConditionsJson NVARCHAR(MAX) NOT NULL DEFAULT '[]',
   MedsJson       NVARCHAR(MAX) NOT NULL DEFAULT '[]',
   CreatedAt   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME()

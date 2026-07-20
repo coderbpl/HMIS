@@ -21,6 +21,8 @@ export const DAM_METHODS = [
   'listSymptoms',         // () -> [{ code, en, hin, dept }]
   'listSlots',            // (dept, date) -> [{ time, free, past }]
   'checkInToken',         // ({ mobile, tokenNo }, actorId) -> token  (booked -> waiting)
+  'returnToTriage',       // (tokenId, actorId) -> token  (vitals wiped, back to nurse queue)
+  'preponeToken',         // ({ mobile, tokenNo }) -> token  (future booking -> today's queue)
   'getPublicQueue',       // (dept) -> masked queue rows (no PHI)
   'updateTokenStatus',    // (tokenId, status, actorId) -> token
   'trackToken',           // ({ mobile, tokenNo }) -> { tokenNo, status, position, nowServing } | null

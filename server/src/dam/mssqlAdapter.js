@@ -87,9 +87,25 @@ export function createMssqlAdapter() {
       return rowToPatient(res.recordset[0]) || null;
     },
 
-    async getPatientByMobile(mobile) {
-      const res = await exec('dbo.usp_Patient_GetByMobile', r => r.input('Mobile', sql.VarChar(15), mobile));
+    async getPatientByMobile(mobile, name = null) {
+      const res = await exec('dbo.usp_Patient_GetByMobile', r => r
+        .input('Mobile', sql.VarChar(15), mobile)
+        .input('FullName', sql.NVarChar(120), name || null));
       return rowToPatient(res.recordset[0]) || null;
+    },
+
+    async returnToTriage(tokenId, actorId) {
+      const res = await exec('dbo.usp_Token_ReturnToTriage', r => r
+        .input('TokenRef', sql.VarChar(16), String(tokenId).replace(/^T-/, ''))
+        .input('ActorRef', sql.VarChar(16), String(actorId || '').replace(/^U-/, '')));
+      return rowToToken(res.recordset[0]);
+    },
+
+    async preponeToken({ mobile, tokenNo }) {
+      const res = await exec('dbo.usp_Token_Prepone', r => r
+        .input('Mobile', sql.VarChar(15), mobile)
+        .input('TokenNo', sql.VarChar(8), tokenNo));
+      return rowToToken(res.recordset[0]);
     },
 
     async saveVitals(tokenId, vitals, actorId) {
@@ -197,7 +213,7 @@ export function createMssqlAdapter() {
       }));
     },
 
-    async saveConsult({ tokenId, doctorId, dx, rx, labs, dispo, notes, allergies, bloodGroup, familyHistory }) {
+    async saveConsult({ tokenId, doctorId, dx, rx, labs, dispo, notes, allergies, bloodGroup, familyHistory, pastIllness, social }) {
       const res = await exec('dbo.usp_Consult_Save', r => r
         .input('TokenRef', sql.VarChar(16), String(tokenId).replace(/^T-/, ''))
         .input('DoctorRef', sql.VarChar(16), String(doctorId || '').replace(/^U-/, ''))
@@ -209,9 +225,12 @@ export function createMssqlAdapter() {
         .input('AllergiesJson', sql.NVarChar(sql.MAX), allergies?.med?.length ? JSON.stringify(allergies.med) : null)
         .input('FoodAllergiesJson', sql.NVarChar(sql.MAX), allergies?.food?.length ? JSON.stringify(allergies.food) : null)
         .input('BloodGroup', sql.VarChar(7), bloodGroup && bloodGroup !== 'Unknown' ? bloodGroup : null)
-        .input('FamilyJson', sql.NVarChar(sql.MAX), familyHistory?.length ? JSON.stringify(familyHistory) : null));
+        .input('FamilyJson', sql.NVarChar(sql.MAX), familyHistory?.length ? JSON.stringify(familyHistory) : null)
+        .input('PastIllnessJson', sql.NVarChar(sql.MAX), pastIllness?.length ? JSON.stringify(pastIllness) : null)
+        .input('SocialJson', sql.NVarChar(sql.MAX), social?.length ? JSON.stringify(social) : null));
       const c = res.recordset[0];
-      return { id: `C-${c.ConsultId}`, tokenId, dispo: c.Disposition, completedAt: c.CompletedAt };
+      // dept drives the route's cache invalidation + SSE push
+      return { id: `C-${c.ConsultId}`, tokenId, dispo: c.Disposition, completedAt: c.CompletedAt, dept: c.Department };
     },
 
     async listDepartments() {

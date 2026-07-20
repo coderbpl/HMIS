@@ -236,6 +236,23 @@ export default function PatientPortal({ onExit }) {
     } finally { setCheckBusy(false); }
   };
 
+  // future booking → today's queue (the old token is cancelled server-side)
+  const [preBusy, setPreBusy] = useState(false);
+  const [preErr, setPreErr] = useState('');
+  const doPrepone = async () => {
+    setPreBusy(true); setPreErr('');
+    try {
+      const t = await api.prepone(mobile, tokenNo);
+      setTokenNo(t.tokenNo);
+      remember(mobile, t.tokenNo);
+      if (t.dept !== dept) setDept(t.dept);
+      const info = await api.trackToken(mobile, t.tokenNo).catch(() => null);
+      if (info) setMine(info);
+    } catch (err) {
+      setPreErr(err.offline ? 'Cannot reach the hospital server right now.' : err.message);
+    } finally { setPreBusy(false); }
+  };
+
   const fmtDate = d => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
@@ -477,10 +494,16 @@ export default function PatientPortal({ onExit }) {
                     <StatusPill s={mine.status} />
 
                     {mine.status === 'booked' && mine.date > todayStr() && (
-                      <div className="note-band" style={{ marginTop: 16, textAlign: 'left' }}>
-                        <span className="nd" style={{ background: 'var(--blue)' }} />
-                        <div><b>Booked: {fmtDate(mine.date)}{mine.slot ? ` · ${mine.slot}` : ''}</b><span>{mine.dept}. Check in at the hospital on that day to join the queue.</span></div>
-                      </div>
+                      <>
+                        <div className="note-band" style={{ marginTop: 16, textAlign: 'left' }}>
+                          <span className="nd" style={{ background: 'var(--blue)' }} />
+                          <div><b>Booked: {fmtDate(mine.date)}{mine.slot ? ` · ${mine.slot}` : ''}</b><span>{mine.dept}. Check in at the hospital on that day to join the queue.</span></div>
+                        </div>
+                        <button className="btn ghost block" style={{ minHeight: 50, fontSize: 14, marginTop: 12 }} onClick={doPrepone} disabled={preBusy}>
+                          <Icon name="cal" size={15} /> {preBusy ? 'Rebooking…' : 'Came early? Get a token for today instead'}
+                        </button>
+                        {preErr && <div className="offline-band" style={{ marginTop: 10, background: '#FBE5E3', borderColor: '#F2B8B3', color: '#A02E24' }}>{preErr}</div>}
+                      </>
                     )}
 
                     {mine.canCheckIn && (
