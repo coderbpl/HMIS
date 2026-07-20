@@ -448,7 +448,8 @@ export function createMemoryAdapter() {
     async updateTokenStatus(tokenId, status, actorId) {
       const t = db.tokens.find(x => x.id === tokenId || x.tokenNo === tokenId);
       if (!t) throw Object.assign(new Error('Token not found'), { status: 404 });
-      const allowed = { booked: ['waiting', 'cancelled'], 'checked-in': ['waiting'], waiting: ['in-consult', 'checked-in'], 'in-consult': ['done', 'waiting'] };
+      const allowed = { booked: ['waiting', 'cancelled'], 'checked-in': ['waiting', 'in-consult'], waiting: ['in-consult', 'checked-in'], 'in-consult': ['done', 'waiting'] };
+      if (t.status === status) return t; // idempotent: resuming an in-consult token is a no-op
       if (!(allowed[t.status] || []).includes(status)) {
         throw Object.assign(new Error(`Cannot move token from ${t.status} to ${status}`), { status: 409 });
       }

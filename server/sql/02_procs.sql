@@ -402,8 +402,21 @@ BEGIN
   DECLARE @Old VARCHAR(12) = (SELECT Status FROM dbo.Tokens WHERE TokenId = @TokenId);
   IF @Old IS NULL THROW 50003, 'Token not found', 1;
 
-  -- allowed transitions only
-  IF NOT ( (@Old = 'checked-in' AND @NewStatus = 'waiting')
+  -- idempotent: re-calling the current state (e.g. Resume on in-consult) is a no-op
+  IF @Old = @NewStatus
+  BEGIN
+    SELECT t.TokenId, dbo.fn_DisplayToken(t.DeptId, t.SeqNo) AS TokenNo,
+           p.PatientCode, d.Name AS Department, t.TokenDate, t.Status, t.Priority,
+           t.VitalsDone, t.IssuedAt, t.CalledAt
+    FROM dbo.Tokens t
+    JOIN dbo.Patients p ON p.PatientId = t.PatientId
+    JOIN dbo.Departments d ON d.DeptId = t.DeptId
+    WHERE t.TokenId = @TokenId;
+    RETURN;
+  END
+
+  -- allowed transitions only ('checked-in' may go straight to consult once triaged)
+  IF NOT ( (@Old = 'checked-in' AND @NewStatus IN ('waiting','in-consult'))
         OR (@Old = 'waiting'    AND @NewStatus IN ('in-consult','checked-in'))
         OR (@Old = 'in-consult' AND @NewStatus IN ('done','waiting')) )
     THROW 50004, 'Invalid status transition', 1;

@@ -290,11 +290,10 @@ INSERT INTO dbo.ConsultTemplates (DoctorId, Name, Category, IsSystemDefault, Com
 GO
 
 
--- Facility seed + FK for the UHID scheme (state → district → facility)
-INSERT INTO dbo.Facilities (FacilityCode, Name, Type, Address, StateCode, DistrictCode, ShortCode) VALUES
- ('DIST_HOSP_01', N'District Hospital, Bhopal',            'District Hospital', N'Bhopal',      'MP', 'BPL', 'DH01'),
- ('PHC_AHD_02',   N'Primary Health Centre, Anand Nagar',   'PHC',               N'Anand Nagar', 'MP', 'BPL', 'PH02'),
- ('CHC_COL_03',   N'Community Health Centre, Kolar',       'CHC',               N'Kolar',       'MP', 'BPL', 'CH03');
+-- UHID codes per facility (facilities themselves are seeded above)
+UPDATE dbo.Facilities SET StateCode='MP', DistrictCode='BPL', ShortCode='DH01' WHERE FacilityCode='DIST_HOSP_01';
+UPDATE dbo.Facilities SET StateCode='MP', DistrictCode='BPL', ShortCode='PH02' WHERE FacilityCode='PHC_AHD_02';
+UPDATE dbo.Facilities SET StateCode='MP', DistrictCode='BPL', ShortCode='CH03' WHERE FacilityCode='CHC_COL_03';
 GO
 ALTER TABLE dbo.Patients ADD CONSTRAINT FK_Patients_Facility
   FOREIGN KEY (FacilityCode) REFERENCES dbo.Facilities(FacilityCode);
