@@ -60,6 +60,7 @@ export function createMemoryAdapter() {
     const t = {
       id: `T-${++seq.token}`, tokenNo, patientId, dept, date: today(),
       status, priority, vitalsDone, issuedAt: new Date().toISOString(),
+      category: 'normal', source: 'counter', triage: null, complaint: '',
     };
     db.tokens.push(t); return t;
   };

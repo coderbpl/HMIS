@@ -735,3 +735,73 @@ input, select, textarea { font-family: inherit; }
 .ehr-tx b { font-size: 13px; display: block; }
 .ehr-tx span { font-size: 11.5px; color: var(--ink-2); display: block; margin-top: 1px; }
 .ehr-tx em { font-style: normal; font-size: 10.5px; color: var(--muted); }
+
+/* ============ e-HR (health record) ============ */
+.ehr { max-width: 980px; }
+.ehr-head { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px; box-shadow: var(--shadow); margin-bottom: 14px; }
+.ehr-head .row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.ehr-head .sub { font-size: 12px; color: var(--ink-2); font-weight: 600; margin-top: 2px; }
+.ehr-head .meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.ehr-attn { background: #FDF1DA; border: 1px solid #F2DCAF; border-radius: 13px; padding: 11px 13px; margin-top: 12px; }
+.ehr-attn > b { font-size: 12px; color: #8a5a00; display: block; margin-bottom: 8px; }
+.ehr-attn .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0; }
+.attn-chip { background: #fff; border: 1.5px solid #F2B8B3; border-radius: 11px; padding: 6px 11px; text-align: left; min-height: 44px; }
+.attn-chip b { display: block; font-size: 12.5px; color: #A02E24; }
+.attn-chip span { font-size: 10px; color: var(--muted); }
+.attn-chip:active { transform: scale(.97); }
+.ehr-chronic { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 11.5px; color: var(--ink-2); margin-top: 12px; }
+.ehr-chronic b { color: var(--ink); }
+
+.ehr-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.ehr-controls .seg button { min-height: 44px; }
+.ehr-search { flex: 1 1 220px; display: flex; align-items: center; gap: 8px; background: #fff; border: 1.5px solid var(--line); border-radius: 11px; padding: 0 12px; min-height: 46px; color: var(--muted); }
+.ehr-search input { border: 0; outline: none; background: none; width: 100%; font-size: 13.5px; color: var(--ink); }
+
+.ehr-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; align-items: start; }
+.ehr-cat-h { display: flex; align-items: center; gap: 7px; font-size: 13px; margin-bottom: 6px; }
+.ehr-cat-h .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+
+.ehr-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 2px; border-bottom: 1px solid var(--line); }
+.ehr-row:last-child { border-bottom: 0; }
+.ehr-row .tx { flex: 1 1 auto; min-width: 0; }
+.ehr-row .tx b { font-size: 12.5px; display: block; }
+.ehr-row .tx span { font-size: 10.5px; color: var(--muted); }
+.ehr-row .val { font-size: 13.5px; font-weight: 800; color: var(--navy); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ehr-row .val em { font-style: normal; font-size: 10px; color: var(--muted); font-weight: 600; }
+.ehr-row .go { color: var(--blue); font-weight: 800; }
+.ehr-row.click { cursor: pointer; border-radius: 9px; }
+.ehr-row.click:hover { background: var(--sky); }
+
+.ehr-dhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.ehr-big { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 4px; }
+.ehr-big .v { font-size: 40px; font-weight: 800; color: var(--navy); line-height: 1; font-variant-numeric: tabular-nums; }
+.ehr-big .u { font-size: 13px; color: var(--muted); font-weight: 700; }
+.ehr-big .since { font-size: 11px; color: var(--muted); }
+.ehr-delta { font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+.ehr-delta.up { background: #FBE5E3; color: #A02E24; }
+.ehr-delta.down { background: #E3F3EC; color: #116B46; }
+.ehr-delta.flat { background: #EEF1F6; color: var(--muted); }
+.ehr-legend { display: flex; gap: 16px; font-size: 10.5px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
+.ehr-legend .sw { display: inline-block; width: 12px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.ehr-legend .sw.band { background: #E3F3EC; border: 1px solid #BFE5D4; }
+.ehr-legend .sw.dot { background: var(--s1); border-radius: 50%; width: 8px; }
+
+.ehr-visit-h { display: flex; align-items: flex-start; gap: 10px; }
+.ehr-visit-h .tx b { font-size: 13px; display: block; }
+.ehr-visit-h .tx span { font-size: 11px; color: var(--muted); }
+.ehr-labline { border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 9px; }
+.ehr-labline .lab-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.ehr-labline .lab-head b { font-size: 12px; }
+.ehr-labline .vals { display: flex; flex-wrap: wrap; gap: 6px; }
+.lab-chip { font-size: 11px; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 4px 9px; color: var(--ink-2); min-height: 32px; }
+.lab-chip b { color: var(--navy); }
+.lab-chip.bad { border-color: #F2B8B3; background: #FBE5E3; }
+.lab-chip.bad b { color: #A02E24; }
+.lab-chip:active { transform: scale(.96); }
+
+@media (max-width: 740px) {
+  .ehr-cats { grid-template-columns: 1fr; }
+  .ehr-big .v { font-size: 32px; }
+  .ehr-controls .seg { width: 100%; display: flex; }
+  .ehr-controls .seg button { flex: 1; }
+}

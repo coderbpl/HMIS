@@ -8,6 +8,7 @@ import {
 } from '../data.js';
 import { api } from '../api.js';
 import { BigChips, DosePad, Stepper, QuickMeds } from '../components/touch.jsx';
+import Ehr from './Ehr.jsx';
 
 const dosesPerDay = d => d === 'SOS' ? 1 : d.split('-').reduce((s, x) => s + Number(x), 0);
 
@@ -16,6 +17,7 @@ const TABS = [
   { key: 'vitals', label: 'Vitals', hin: 'वाइटल्स', icon: 'pulse' },
   { key: 'allergy', label: 'Allergy & Blood', hin: 'एलर्जी', icon: 'warn' },
   { key: 'history', label: 'History', hin: 'इतिहास', icon: 'history' },
+  { key: 'ehr', label: 'e-HR Record', hin: 'हेल्थ रिकॉर्ड', icon: 'doc' },
   { key: 'diagnosis', label: 'Diagnosis', hin: 'निदान', icon: 'stetho' },
   { key: 'prescription', label: 'Prescription', hin: 'पर्ची', icon: 'pill' },
   { key: 'orders', label: 'Lab Orders', hin: 'जांच', icon: 'flask' },
@@ -409,6 +411,7 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
         </div>
       </div>
     ),
+    ehr: <Ehr patient={p} />,
     history: (
       <div className="grid-2eq">
         <div className="card">
