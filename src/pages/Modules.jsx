@@ -62,8 +62,8 @@ export function OpdQueue({ openConsult }) {
               <span>{p.complaint || p.dept}</span>
             </div>
             <div className="acts">
-              {q.priority === 'urgent' && <StatusPill s="urgent" />}
-              <Pill tone={q.vitalsDone ? 'ok' : 'neu'}>{q.vitalsDone ? 'Vitals ✓' : 'Vitals pending'}</Pill>
+              {q.category === 'emergency' ? <TriagePill t={q.triage || 'yellow'} /> : q.priority === 'urgent' && <StatusPill s="urgent" />}
+              <Pill tone={q.vitalsDone ? 'ok' : 'neu'}>{q.vitalsDone ? 'Vitals ✓' : q.category === 'emergency' ? 'Vitals at bedside' : 'Vitals pending'}</Pill>
               <StatusPill s={q.status} />
               <button className="btn primary sm" disabled={busy === q.id} onClick={() => start(q)}>
                 {q.status === 'in-consult' ? 'Resume' : 'Start consult'}
@@ -121,11 +121,18 @@ const FEE_OPTIONS = [
 ];
 const CATEGORIES = ['● Normal', '↪ Referral-in', '🚨 Emergency'];
 const catValue = c => c.includes('Emergency') ? 'emergency' : c.includes('Referral') ? 'referral' : 'normal';
+/* ESI-style emergency severity — red is seen before yellow before green */
+const TRIAGE_OPTIONS = ['🔴 Red — immediate', '🟡 Yellow — urgent', '🟢 Green — can wait'];
+const TRIAGE_VALUES = { [TRIAGE_OPTIONS[0]]: 'red', [TRIAGE_OPTIONS[1]]: 'yellow', [TRIAGE_OPTIONS[2]]: 'green' };
+export const TriagePill = ({ t }) => t
+  ? <Pill tone={t === 'red' ? 'bad' : t === 'yellow' ? 'warn' : 'ok'}>{t === 'red' ? '🔴' : t === 'yellow' ? '🟡' : '🟢'} {t.toUpperCase()}</Pill>
+  : null;
 
 export function Register() {
   const empty = { name: '', mobile: '', age: '', sex: 'F', dept: 'General Medicine', abha: '', scheme: '' };
   const [f, setF] = useState(empty);
   const [category, setCategory] = useState(CATEGORIES[0]);
+  const [triage, setTriage] = useState(TRIAGE_OPTIONS[1]); // default yellow
   const [symptomList, setSymptomList] = useState([]);
   const [symptoms, setSymptoms] = useState([]);
   const [deptTouched, setDeptTouched] = useState(false);
@@ -172,10 +179,10 @@ export function Register() {
         dept: f.dept, abha: f.abha || undefined, scheme: f.scheme || undefined, issueToken: 'yes',
         category: catValue(category),
         symptoms: symptomList.filter(s => symptoms.includes(symLabel(s))).map(s => s.code),
-        ...(isEmergency ? {} : { feeAmount: feeOpt.feeAmount, feeExemption: feeOpt.feeExemption || undefined }),
+        ...(isEmergency ? { triage: TRIAGE_VALUES[triage] } : { feeAmount: feeOpt.feeAmount, feeExemption: feeOpt.feeExemption || undefined }),
       });
       setResult(res);
-      setF(empty); setSymptoms([]); setCategory(CATEGORIES[0]); setFee(FEE_OPTIONS[0].label); setDeptTouched(false);
+      setF(empty); setSymptoms([]); setCategory(CATEGORIES[0]); setFee(FEE_OPTIONS[0].label); setDeptTouched(false); setTriage(TRIAGE_OPTIONS[1]);
     } catch (ex) {
       setErr(ex.offline ? 'API unreachable — start the server (cd server && npm run dev) to register for real.' : ex.message);
     } finally { setBusy(false); }
@@ -191,9 +198,15 @@ export function Register() {
           <BigChips options={CATEGORIES} value={category} onChange={v => setCategory(v || CATEGORIES[0])} cols={3} />
         </div>
         {catValue(category) === 'emergency' && (
-          <div className="offline-band" style={{ background: '#FBE5E3', borderColor: '#F2B8B3', color: '#A02E24' }}>
-            Emergency — token issued as <b>urgent</b>, straight to the doctor (triage bypassed). Name, mobile and age are optional; fee is waived for now — complete the record once the patient is stable.
-          </div>
+          <>
+            <div className="offline-band" style={{ background: '#FBE5E3', borderColor: '#F2B8B3', color: '#A02E24' }}>
+              Emergency — straight to the doctor, red before yellow before green. Name, mobile and age are optional; fee is waived — vitals are recorded at the bedside, and the record is completed once the patient is stable.
+            </div>
+            <span className="tlabel">Triage severity <em>· tap to change</em></span>
+            <div style={{ marginBottom: 12 }}>
+              <BigChips options={TRIAGE_OPTIONS} value={triage} onChange={v => setTriage(v || TRIAGE_OPTIONS[1])} cols={3} />
+            </div>
+          </>
         )}
         <div className="f-row">
           <div className="f-group"><label className="f-label">Full name {catValue(category) === 'emergency' ? <em>(if known)</em> : '*'}</label><input className="f-inp" placeholder={catValue(category) === 'emergency' ? 'Unknown if unidentified' : 'As per ID document'} value={f.name} onChange={set('name')} /></div>
@@ -333,10 +346,11 @@ export function Triage() {
         {pending.map(q => (
           <div key={q.id} className={`tok ${sel?.id === q.id ? 'now' : ''}`}>
             <div className="tno">{q.tokenNo}</div>
-            <div className="tx"><b>{q.patient.name} · {q.patient.age} {q.patient.sex}</b><span>{q.patient.dept}{q.patient.complaint ? ` · ${q.patient.complaint.slice(0, 44)}…` : ''}</span></div>
+            <div className="tx"><b>{q.patient.name} · {q.patient.age ?? '—'} {q.patient.sex}</b><span>{q.patient.dept}{q.patient.complaint ? ` · ${q.patient.complaint.slice(0, 44)}…` : ''}</span></div>
             <div className="acts">
+              {q.category === 'emergency' && <TriagePill t={q.triage || 'yellow'} />}
               <button className="btn primary sm" onClick={() => { setSel(q); setMsg(null); }}>
-                {sel?.id === q.id ? 'Selected' : 'Record vitals'}
+                {sel?.id === q.id ? 'Selected' : q.category === 'emergency' ? 'Bedside vitals' : 'Record vitals'}
               </button>
             </div>
           </div>

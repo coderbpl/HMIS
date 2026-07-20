@@ -64,6 +64,7 @@ CREATE TABLE dbo.Tokens (
              CHECK (Status IN ('booked','checked-in','waiting','in-consult','done','cancelled')),
   Priority   VARCHAR(10)  NOT NULL DEFAULT 'normal' CHECK (Priority IN ('normal','urgent')),
   Category   VARCHAR(10)  NOT NULL DEFAULT 'normal' CHECK (Category IN ('normal','emergency','referral')),
+  TriageLevel VARCHAR(6)  NULL CHECK (TriageLevel IN ('red','yellow','green')), -- emergency severity
   Source     VARCHAR(8)   NOT NULL DEFAULT 'counter' CHECK (Source IN ('counter','self')),
   Complaint  NVARCHAR(200) NULL,          -- symptom chips / chief complaint at booking
   FeeAmount  INT          NULL,

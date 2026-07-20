@@ -211,7 +211,7 @@ CREATE OR ALTER PROCEDURE dbo.usp_Token_Issue
   @PatientCode VARCHAR(24), @Department NVARCHAR(60), @Priority VARCHAR(10) = 'normal',
   @Category VARCHAR(10) = 'normal', @Source VARCHAR(8) = 'counter',
   @Complaint NVARCHAR(200) = NULL, @FeeAmount INT = NULL, @FeeExemption NVARCHAR(30) = NULL,
-  @TokenDate DATE = NULL, @SlotTime CHAR(5) = NULL
+  @TokenDate DATE = NULL, @SlotTime CHAR(5) = NULL, @TriageLevel VARCHAR(6) = NULL
 AS
 BEGIN
   SET NOCOUNT ON;
@@ -248,16 +248,17 @@ BEGIN
     WHERE DeptId = @DeptId AND TokenDate = @Date;
 
     INSERT INTO dbo.Tokens (TokenDate, DeptId, SeqNo, PatientId, Status, Priority,
-                            Category, Source, Complaint, FeeAmount, FeeExemption, SlotTime)
+                            Category, Source, Complaint, FeeAmount, FeeExemption, SlotTime, TriageLevel)
     VALUES (@Date, @DeptId, @Seq, @PatientId, @Status, @Priority,
-            @Category, @Source, @Complaint, @FeeAmount, @FeeExemption, @SlotTime);
+            @Category, @Source, @Complaint, @FeeAmount, @FeeExemption, @SlotTime,
+            CASE WHEN @Category = 'emergency' THEN ISNULL(@TriageLevel, 'yellow') END);
 
     DECLARE @NewId INT = SCOPE_IDENTITY();
   COMMIT;
 
   SELECT t.TokenId, dbo.fn_DisplayToken(t.DeptId, t.SeqNo) AS TokenNo,
          p.PatientCode, d.Name AS Department, t.TokenDate, t.Status, t.Priority,
-         t.Category, t.Source, t.Complaint, t.FeeAmount, t.FeeExemption, t.SlotTime,
+         t.Category, t.Source, t.Complaint, t.FeeAmount, t.FeeExemption, t.SlotTime, t.TriageLevel,
          t.VitalsDone, t.IssuedAt, t.ArrivedAt, t.CalledAt
   FROM dbo.Tokens t
   JOIN dbo.Patients p ON p.PatientId = t.PatientId
@@ -356,7 +357,7 @@ BEGIN
   SET NOCOUNT ON;
   EXEC dbo.usp_Token_ExpireStale;
   SELECT t.TokenId, dbo.fn_DisplayToken(t.DeptId, t.SeqNo) AS TokenNo,
-         t.TokenDate, t.Status, t.Priority, t.Category, t.Source, t.SlotTime,
+         t.TokenDate, t.Status, t.Priority, t.Category, t.Source, t.SlotTime, t.TriageLevel,
          t.VitalsDone, t.IssuedAt, t.ArrivedAt, t.CalledAt,
          p.PatientCode, p.FullName, p.Mobile, p.Age, p.Sex, d.Name AS Department,
          p.Abha, p.Scheme, p.BloodGroup, p.AllergiesJson, p.FoodAllergiesJson, p.FamilyJson,
@@ -371,7 +372,9 @@ BEGIN
   WHERE t.TokenDate = CAST(SYSUTCDATETIME() AS DATE)
     AND t.Status <> 'done' AND t.Status <> 'cancelled'
     AND (@Department IS NULL OR d.Name = @Department)
-  ORDER BY CASE t.Priority WHEN 'urgent' THEN 0 ELSE 1 END, t.SeqNo;
+  ORDER BY CASE WHEN t.Category = 'emergency' THEN
+             CASE t.TriageLevel WHEN 'red' THEN 0 WHEN 'yellow' THEN 1 ELSE 2 END
+           WHEN t.Priority = 'urgent' THEN 3 ELSE 4 END, t.SeqNo;
 END;
 GO
 
@@ -388,7 +391,9 @@ BEGIN
   WHERE t.TokenDate = CAST(SYSUTCDATETIME() AS DATE)
     AND t.Status IN ('checked-in','waiting','in-consult')
     AND (@Department IS NULL OR d.Name = @Department)
-  ORDER BY CASE t.Priority WHEN 'urgent' THEN 0 ELSE 1 END, t.SeqNo;
+  ORDER BY CASE WHEN t.Category = 'emergency' THEN
+             CASE t.TriageLevel WHEN 'red' THEN 0 WHEN 'yellow' THEN 1 ELSE 2 END
+           WHEN t.Priority = 'urgent' THEN 3 ELSE 4 END, t.SeqNo;
 END;
 GO
 
@@ -891,5 +896,54 @@ BEGIN
   -- reissue in today's series (usp_Token_Issue serializes the sequence)
   EXEC dbo.usp_Token_Issue @PatientCode = @PatientCode, @Department = @DeptName,
        @Priority = @Priority, @Category = @Category, @Source = 'self', @Complaint = @Complaint;
+END;
+GO
+
+-- EHR timeline: every visit, vitals reading, consult and prescription for a
+-- patient as typed events, newest first. UI groups by date / filters by type.
+CREATE OR ALTER PROCEDURE dbo.usp_Patient_History @PatientCode VARCHAR(24)
+AS
+BEGIN
+  SET NOCOUNT ON;
+  DECLARE @PatientId INT = (SELECT PatientId FROM dbo.Patients WHERE PatientCode = @PatientCode);
+  IF @PatientId IS NULL THROW 50002, 'Unknown patient', 1;
+
+  SELECT * FROM (
+    SELECT 'visit' AS EventType, t.IssuedAt AS At, t.TokenDate AS EventDate,
+           'OPD visit · token ' + dbo.fn_DisplayToken(t.DeptId, t.SeqNo) AS Title,
+           d.Name + ISNULL(' · ' + t.Complaint, '') AS Detail,
+           t.Status AS Status, CAST(NULL AS NVARCHAR(120)) AS ByName
+    FROM dbo.Tokens t JOIN dbo.Departments d ON d.DeptId = t.DeptId
+    WHERE t.PatientId = @PatientId
+    UNION ALL
+    SELECT 'vitals', v.RecordedAt, CAST(v.RecordedAt AS DATE),
+           'Vitals recorded',
+           CONCAT_WS(' · ',
+             CASE WHEN v.Bp IS NOT NULL THEN 'BP ' + v.Bp END,
+             CASE WHEN v.Pulse IS NOT NULL THEN 'pulse ' + CAST(v.Pulse AS VARCHAR(4)) END,
+             CASE WHEN v.Temp IS NOT NULL THEN CAST(v.Temp AS VARCHAR(6)) + '°F' END,
+             CASE WHEN v.Spo2 IS NOT NULL THEN 'SpO₂ ' + CAST(v.Spo2 AS VARCHAR(4)) + '%' END,
+             CASE WHEN v.Weight IS NOT NULL THEN CAST(v.Weight AS VARCHAR(6)) + ' kg' END),
+           NULL, u.FullName
+    FROM dbo.Vitals v LEFT JOIN dbo.Users u ON u.UserId = v.RecordedBy
+    WHERE v.PatientId = @PatientId
+    UNION ALL
+    SELECT 'consult', c.CompletedAt, CAST(c.CompletedAt AS DATE),
+           ISNULL(c.Diagnosis, 'Consultation'),
+           CONCAT_WS(' · ', 'disposition: ' + c.Disposition,
+             CASE WHEN c.LabsJson <> '[]' THEN 'labs ordered' END),
+           NULL, u.FullName
+    FROM dbo.Consults c LEFT JOIN dbo.Users u ON u.UserId = c.DoctorId
+    WHERE c.PatientId = @PatientId
+    UNION ALL
+    SELECT 'rx', c.CompletedAt, CAST(c.CompletedAt AS DATE),
+           'Prescription',
+           (SELECT STRING_AGG(JSON_VALUE(j.value, '$.name'), ', ')
+            FROM OPENJSON(pr.ItemsJson) j),
+           pr.Status, NULL
+    FROM dbo.Prescriptions pr JOIN dbo.Consults c ON c.ConsultId = pr.ConsultId
+    WHERE pr.PatientId = @PatientId
+  ) ev
+  ORDER BY ev.At DESC;
 END;
 GO

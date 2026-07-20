@@ -36,6 +36,7 @@ export function createMssqlAdapter() {
     date: r.TokenDate?.toISOString?.().slice(0, 10) ?? r.TokenDate,
     status: r.Status, priority: r.Priority, vitalsDone: !!r.VitalsDone,
     category: r.Category || 'normal', source: r.Source || 'counter',
+    triage: r.TriageLevel || null,
     complaint: r.Complaint || '', slot: r.SlotTime || null,
     feeAmount: r.FeeAmount ?? null, feeExemption: r.FeeExemption ?? null,
     issuedAt: r.IssuedAt, arrivedAt: r.ArrivedAt, calledAt: r.CalledAt,
@@ -122,7 +123,7 @@ export function createMssqlAdapter() {
       return rowToToken(res.recordset[0]);
     },
 
-    async issueToken({ patientId, dept, priority = 'normal', category = 'normal', source = 'counter', symptoms = [], complaint = '', feeAmount = null, feeExemption = null, date = null, slot = null }) {
+    async issueToken({ patientId, dept, priority = 'normal', category = 'normal', source = 'counter', symptoms = [], complaint = '', feeAmount = null, feeExemption = null, date = null, slot = null, triage = null }) {
       const symptomText = complaint || (symptoms.length ? symptoms.join(', ') : null);
       const res = await exec('dbo.usp_Token_Issue', r => r
         .input('PatientCode', sql.VarChar(24), patientId)
@@ -134,8 +135,18 @@ export function createMssqlAdapter() {
         .input('FeeAmount', sql.Int, feeAmount)
         .input('FeeExemption', sql.NVarChar(30), feeExemption)
         .input('TokenDate', sql.Date, date)
-        .input('SlotTime', sql.Char(5), slot));
+        .input('SlotTime', sql.Char(5), slot)
+        .input('TriageLevel', sql.VarChar(6), category === 'emergency' ? (triage || 'yellow') : null));
       return rowToToken(res.recordset[0]);
+    },
+
+    async getPatientHistory(patientId) {
+      const res = await exec('dbo.usp_Patient_History', r => r.input('PatientCode', sql.VarChar(24), patientId));
+      return res.recordset.map(r => ({
+        type: r.EventType, at: r.At, date: r.EventDate?.toISOString?.().slice(0, 10) ?? String(r.EventDate),
+        title: r.Title, detail: r.Detail || '', status: r.Status || null,
+        doctor: r.ByName || null, recordedBy: r.ByName || null,
+      }));
     },
 
     async listSymptoms() {

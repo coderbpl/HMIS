@@ -64,6 +64,7 @@ export const api = {
   issueToken: body => request('/queue/tokens', { method: 'POST', body }),
   updateTokenStatus: (id, status) => request(`/queue/tokens/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status } }),
   saveVitals: (id, vitals) => request(`/queue/tokens/${encodeURIComponent(id)}/vitals`, { method: 'PATCH', body: vitals }),
+  patientHistory: id => request(`/patients/${encodeURIComponent(id)}/history`),
   saveConsult: body => request('/consults', { method: 'POST', body }),
 
   // public (no auth) — used by the patient portal

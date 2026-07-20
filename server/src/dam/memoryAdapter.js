@@ -49,7 +49,8 @@ export function createMemoryAdapter() {
     facilityMedicines: [],
     doctorMedicines: [],
     consultTemplates: [],
-    prescriptions: []
+    prescriptions: [],
+    vitalsLog: []
   };
   let seq = { patient: 24076, token: 0, consult: 0, template: 0, prescription: 1, uhid: {} }; // PR-1 is seeded
   const today = () => new Date().toISOString().slice(0, 10);
@@ -290,18 +291,61 @@ export function createMemoryAdapter() {
       const t = db.tokens.find(x => x.id === tokenId || x.tokenNo === tokenId);
       if (!t) throw Object.assign(new Error('Token not found'), { status: 404 });
       const p = db.patients.find(x => x.id === t.patientId);
+      const at = new Date().toISOString();
       Object.assign(p, {
         bp: vitals.bp ?? p.bp, pulse: vitals.pulse ?? p.pulse, temp: vitals.temp ?? p.temp,
         spo2: vitals.spo2 ?? p.spo2, rr: vitals.rr ?? p.rr, weight: vitals.weight ?? p.weight,
         height: vitals.height ?? p.height,
-        vitalsAt: new Date().toISOString(),
+        vitalsAt: at,
       });
       t.vitalsDone = true;
+      // append-only trail — the EHR timeline reads from here, never from the
+      // mutable snapshot on the patient
+      db.vitalsLog.push({ tokenId: t.id, patientId: t.patientId, ...vitals, recordedBy: actorId, recordedAt: at });
       await this.audit({ actorId, action: 'vitals.save', entity: 'token', entityId: t.id, detail: vitals.bp || '' });
       return { ...t, patient: p };
     },
 
-    async issueToken({ patientId, dept, priority = 'normal', category = 'normal', source = 'counter', symptoms = [], complaint = '', feeAmount = null, feeExemption = null, date = null, slot = null }) {
+    /**
+     * EHR timeline: every visit, vitals reading, consultation and prescription
+     * for one patient, newest first. The UI groups by date and filters by
+     * category — the DAM just returns typed events.
+     */
+    async getPatientHistory(patientId) {
+      const p = db.patients.find(x => x.id === patientId);
+      if (!p) throw Object.assign(new Error('Patient not found'), { status: 404 });
+      const events = [];
+      db.tokens.filter(t => t.patientId === patientId).forEach(t => events.push({
+        type: 'visit', at: t.issuedAt, date: t.date,
+        title: `OPD visit · token ${t.tokenNo}`,
+        detail: [t.dept, t.complaint, t.category !== 'normal' ? t.category : null].filter(Boolean).join(' · '),
+        status: t.status,
+      }));
+      db.vitalsLog.filter(v => v.patientId === patientId).forEach(v => events.push({
+        type: 'vitals', at: v.recordedAt, date: String(v.recordedAt).slice(0, 10),
+        title: 'Vitals recorded',
+        detail: [v.bp && `BP ${v.bp}`, v.pulse && `pulse ${v.pulse}`, v.temp && `${v.temp}°F`,
+          v.spo2 && `SpO₂ ${v.spo2}%`, v.weight && `${v.weight} kg`].filter(Boolean).join(' · '),
+        recordedBy: db.users.find(u => u.id === v.recordedBy)?.name || null,
+      }));
+      db.consults.filter(c => c.patientId === patientId).forEach(c => events.push({
+        type: 'consult', at: c.completedAt, date: String(c.completedAt).slice(0, 10),
+        title: c.dx || 'Consultation',
+        detail: [c.dispo && `disposition: ${c.dispo}`, c.labs?.length ? `labs: ${c.labs.join(', ')}` : null].filter(Boolean).join(' · '),
+        doctor: db.users.find(u => u.id === c.doctorId)?.name || null,
+      }));
+      db.prescriptions.filter(r => r.patientId === patientId).forEach(r => events.push({
+        type: 'rx', at: r.dispensedAt || r.id, date: String(db.consults.find(c => c.id === r.consultId)?.completedAt || '').slice(0, 10) || today(),
+        title: `Prescription · ${r.items.length} medicine${r.items.length === 1 ? '' : 's'}`,
+        detail: r.items.map(i => i.name || i.med).filter(Boolean).join(', '),
+        status: r.status,
+      }));
+      return events
+        .filter(e => e.date)
+        .sort((a, b) => String(b.at || b.date).localeCompare(String(a.at || a.date)));
+    },
+
+    async issueToken({ patientId, dept, priority = 'normal', category = 'normal', source = 'counter', symptoms = [], complaint = '', feeAmount = null, feeExemption = null, date = null, slot = null, triage = null }) {
       const d = DEPARTMENTS.find(x => x.name === dept);
       if (!d) throw Object.assign(new Error('Unknown department'), { status: 400 });
       const targetDate = date || today();
@@ -328,6 +372,8 @@ export function createMemoryAdapter() {
         status: (source === 'self' || targetDate > today()) ? 'booked' : 'waiting',
         priority: category === 'emergency' ? 'urgent' : priority,
         category, source, slot,
+        // ESI-style severity for emergencies: red (immediate) / yellow (urgent) / green (can wait)
+        triage: category === 'emergency' ? (triage || 'yellow') : null,
         complaint: complaint || symptomText || '',
         feeAmount, feeExemption,
         vitalsDone: false, issuedAt: new Date().toISOString(),
@@ -361,9 +407,13 @@ export function createMemoryAdapter() {
 
     async getQueueByDept(dept) {
       this.expireStaleBookings();
+      // emergencies lead, red before yellow before green, then arrival order
+      const rank = t => t.category === 'emergency'
+        ? { red: 0, yellow: 1, green: 2 }[t.triage] ?? 1
+        : (t.priority === 'urgent' ? 3 : 4);
       return db.tokens
         .filter(t => t.date === today() && (!dept || t.dept === dept) && !['done', 'cancelled'].includes(t.status))
-        .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
+        .sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id, undefined, { numeric: true }))
         .map(t => {
           const patient = db.patients.find(p => p.id === t.patientId) || null;
           return { ...t, patient: patient ? { ...patient, complaint: t.complaint || patient.complaint } : null };

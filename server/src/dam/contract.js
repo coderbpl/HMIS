@@ -16,6 +16,7 @@ export const DAM_METHODS = [
   'getPatientByAbha',     // (abha) -> patient | null
   'getPatientByMobile',   // (mobile) -> patient | null
   'saveVitals',           // (tokenId, { bp, pulse, temp, spo2, rr, weight }, actorId) -> token
+  'getPatientHistory',    // (patientId) -> EHR events [{ type, at, date, title, detail, … }] newest first
   'issueToken',           // ({ patientId, dept, priority, category, source, symptoms, complaint, feeAmount, feeExemption, date, slot }) -> token
   'getQueueByDept',       // (dept) -> [{ ...token, patient }]
   'listSymptoms',         // () -> [{ code, en, hin, dept }]

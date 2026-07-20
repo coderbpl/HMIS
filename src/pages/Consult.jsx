@@ -76,6 +76,18 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
   const [done, setDone] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState('');
+  // EHR overlay — full patient timeline from the API
+  const [ehrOpen, setEhrOpen] = useState(false);
+  const [ehrEvents, setEhrEvents] = useState(null);
+  const [ehrBusy, setEhrBusy] = useState(false);
+  const openEhr = async () => {
+    setEhrOpen(true);
+    if (ehrEvents) return;
+    setEhrBusy(true);
+    try { setEhrEvents(await api.patientHistory(p.id)); }
+    catch { setEhrEvents([]); }
+    finally { setEhrBusy(false); }
+  };
   
   // Custom states for inputs to support templates
   const [complaint, setComplaint] = useState(p.complaint || '');
@@ -647,9 +659,14 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
             <StatusPill s="in-consult" />
           </div>
           <div className="acts">
+            <button className="btn ghost sm" onClick={openEhr}><Icon name="history" size={14} /> EHR</button>
             <button className="btn ghost sm" onClick={() => window.print()}><Icon name="clip" size={14} /> Print slip</button>
           </div>
         </div>
+
+        {ehrOpen && (
+          <EhrPanel patient={p} events={ehrEvents} busy={ehrBusy} onClose={() => setEhrOpen(false)} />
+        )}
 
         {/* Dynamic Facility & Template control bar */}
         <div className="consult-bar">
@@ -715,6 +732,80 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------- EHR overlay: full patient timeline, filter by category, grouped by date ---------- */
+const EHR_TYPES = [
+  { key: 'all', label: 'All', icon: 'history' },
+  { key: 'visit', label: 'Visits', icon: 'cal' },
+  { key: 'vitals', label: 'Vitals', icon: 'pulse' },
+  { key: 'consult', label: 'Consults', icon: 'stetho' },
+  { key: 'rx', label: 'Prescriptions', icon: 'pill' },
+];
+const EHR_TONE = { visit: 'neu', vitals: 'warn', consult: 'info', rx: 'ok' };
+
+function EhrPanel({ patient, events, busy, onClose }) {
+  const [filter, setFilter] = useState('all');
+  const list = (events || []).filter(e => filter === 'all' || e.type === filter);
+  const counts = (events || []).reduce((m, e) => ({ ...m, [e.type]: (m[e.type] || 0) + 1 }), {});
+  // group by date, newest first (API already sorts newest-first)
+  const groups = [];
+  list.forEach(e => {
+    const g = groups.find(x => x.date === e.date);
+    if (g) g.items.push(e); else groups.push({ date: e.date, items: [e] });
+  });
+  const fmtDate = d => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      if (d === today) return 'Today';
+      return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    } catch { return d; }
+  };
+  return (
+    <div className="ehr-overlay" role="dialog" aria-label={`Health record of ${patient.name}`}>
+      <div className="ehr-scrim" onClick={onClose} />
+      <div className="ehr-panel">
+        <div className="ehr-head">
+          <div>
+            <b>{patient.name} · EHR</b>
+            <span>{patient.id}{patient.abha ? ` · ABHA ${patient.abha}` : ''}{patient.bloodGroup ? ` · ${patient.bloodGroup}` : ''}</span>
+          </div>
+          <button className="icon-btn" onClick={onClose} aria-label="Close health record"><Icon name="plus" style={{ transform: 'rotate(45deg)' }} /></button>
+        </div>
+
+        <div className="ehr-filters">
+          {EHR_TYPES.map(t => (
+            <button key={t.key} className={`chip ${filter === t.key ? 'on' : ''}`} onClick={() => setFilter(t.key)}>
+              {t.label}{t.key !== 'all' && counts[t.key] ? ` · ${counts[t.key]}` : ''}
+            </button>
+          ))}
+        </div>
+
+        <div className="ehr-body">
+          {busy && <div className="empty">Loading record…</div>}
+          {!busy && groups.length === 0 && <div className="empty">No history yet for this patient.</div>}
+          {groups.map(g => (
+            <div key={g.date} className="ehr-day">
+              <div className="ehr-date">{fmtDate(g.date)}</div>
+              {g.items.map((e, i) => (
+                <div key={i} className="ehr-ev">
+                  <span className={`ehr-ic pill ${EHR_TONE[e.type] || 'neu'}`}>
+                    <Icon name={EHR_TYPES.find(t => t.key === e.type)?.icon || 'doc'} size={13} />
+                  </span>
+                  <div className="ehr-tx">
+                    <b>{e.title}</b>
+                    {e.detail && <span>{e.detail}</span>}
+                    {(e.doctor || e.recordedBy) && <em>by {e.doctor || e.recordedBy}</em>}
+                  </div>
+                  {e.status && <StatusPill s={e.status} />}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

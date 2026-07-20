@@ -307,3 +307,11 @@ PRINT 'Schema migration complete.';
 PRINT '>>> NOW RE-RUN 02_procs.sql — it recreates every procedure (CREATE OR ALTER)';
 PRINT '>>> so all 36 procs match this schema: sqlcmd -S <server> -d HMIS -i 02_procs.sql';
 GO
+
+-- ---------- Emergency triage severity + EHR history ----------
+IF COL_LENGTH('dbo.Tokens', 'TriageLevel') IS NULL
+  ALTER TABLE dbo.Tokens ADD TriageLevel VARCHAR(6) NULL
+    CHECK (TriageLevel IN ('red','yellow','green'));
+GO
+-- After running this migration, re-run 02_procs.sql to refresh
+-- usp_Token_Issue, the queue procs and the new usp_Patient_History.
