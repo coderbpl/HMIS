@@ -31,6 +31,10 @@ export default function Shell({ role, nav, page, setPage, title, subtitle, onLog
 
       <div className="main">
         <header className="topbar">
+          <div className="topbar-brand" title={`${HOSPITAL.name} · ${HOSPITAL.sub}`}>
+            <div className="brand-mark sm"><Icon name="cross" /></div>
+            <div className="tb-name"><b className="hin">{HOSPITAL.name}</b><span className="hin">{HOSPITAL.sub}</span></div>
+          </div>
           <div className="tt"><b>{title}</b><span>{subtitle}</span></div>
           <div className="top-search">
             <Icon name="search" />

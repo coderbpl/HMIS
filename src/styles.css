@@ -78,6 +78,14 @@ input, select, textarea { font-family: inherit; }
 
 .main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 
+/* App name in the top bar — only shown when the sidebar collapses (tablet/mobile) */
+.topbar-brand { display: none; align-items: center; gap: 9px; min-width: 0; }
+.topbar-brand .brand-mark.sm { width: 32px; height: 32px; border-radius: 9px; }
+.topbar-brand .brand-mark.sm svg { width: 18px; height: 18px; }
+.topbar-brand .tb-name { min-width: 0; }
+.topbar-brand .tb-name b { display: block; font-size: 13px; line-height: 1.15; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar-brand .tb-name span { display: block; font-size: 10px; color: var(--muted); line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 .topbar {
   flex: 0 0 auto; display: flex; align-items: center; gap: 14px;
   padding: 12px 22px; background: var(--card); border-bottom: 1px solid var(--line);
@@ -382,6 +390,7 @@ input, select, textarea { font-family: inherit; }
 @media (max-width: 1180px) {
   .sidenav { width: 74px; padding: 14px 9px; }
   .brand-name, .nav-item .lab, .nav-user .txt { display: none; }
+  .topbar-brand { display: flex; max-width: 46%; }
   .nav-item { justify-content: center; padding: 12px 0; }
   .nav-user { justify-content: center; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -400,7 +409,10 @@ input, select, textarea { font-family: inherit; }
   .sidenav { display: none; }
   .topbar { padding: 10px 14px; gap: 10px; }
   .top-search { display: none; }
-  .topbar .tt b { font-size: 15px; }
+  /* the bottom nav already labels the current section, so free the room for the app name */
+  .topbar .tt { display: none; }
+  .topbar-brand { max-width: none; flex: 1 1 auto; }
+  .topbar-brand .tb-name b { font-size: 13.5px; white-space: normal; }
   .content { padding: 14px 14px 90px; }
   .content.fixed { padding: 0; }
   .bottomnav {

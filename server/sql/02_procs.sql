@@ -417,13 +417,15 @@ BEGIN
   OUTER APPLY (SELECT TOP 1 * FROM dbo.Consults WHERE TokenId = t.TokenId ORDER BY ConsultId DESC) c
   LEFT JOIN dbo.Users u ON u.UserId = c.DoctorId
   WHERE t.TokenId = @TokenId;
-  -- (2) patient
+  -- (2) patient + the vitals recorded for this token at triage
   SELECT p.PatientCode, p.FullName, p.Mobile, p.Age, p.Sex, d.Name AS Department,
          p.Abha, p.Scheme, p.BloodGroup, p.AllergiesJson, p.FoodAllergiesJson, p.FamilyJson,
          p.ConditionsJson, p.MedsJson, NULL AS Complaint, NULL AS LastVisit,
-         NULL AS Bp, NULL AS Pulse, NULL AS Temp, NULL AS Spo2, NULL AS Rr, NULL AS Weight, NULL AS Height, NULL AS VitalsAt
+         v.Bp, v.Pulse, v.Temp, v.Spo2, v.Rr, v.Weight, v.Height, v.RecordedAt AS VitalsAt
   FROM dbo.Tokens t JOIN dbo.Patients p ON p.PatientId = t.PatientId
   JOIN dbo.Departments d ON d.DeptId = p.DeptId
+  OUTER APPLY (SELECT TOP 1 Bp, Pulse, Temp, Spo2, Rr, Weight, Height, RecordedAt
+               FROM dbo.Vitals WHERE TokenId = t.TokenId ORDER BY RecordedAt DESC) v
   WHERE t.TokenId = @TokenId;
   -- (3) prescription
   SELECT TOP 1 PrescriptionId, Status, ItemsJson FROM dbo.Prescriptions
