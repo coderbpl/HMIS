@@ -98,8 +98,14 @@ export const api = {
   }),
   deleteTemplate: id => request(`/templates/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-  // Pharmacy
-  getPrescriptions: (status, facilityCode) => request(`/pharmacy/prescriptions?status=${encodeURIComponent(status || '')}&facilityCode=${encodeURIComponent(facilityCode || '')}`),
+  // Pharmacy — only include params that have a value (empty status fails enum validation)
+  getPrescriptions: (status, facilityCode) => {
+    const qs = new URLSearchParams();
+    if (status) qs.set('status', status);
+    if (facilityCode) qs.set('facilityCode', facilityCode);
+    const q = qs.toString();
+    return request(`/pharmacy/prescriptions${q ? `?${q}` : ''}`);
+  },
   updatePrescriptionStatus: (id, status) => request(`/pharmacy/prescriptions/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status } }),
 
   // Admin Reporting
