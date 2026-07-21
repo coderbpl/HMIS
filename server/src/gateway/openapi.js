@@ -121,7 +121,7 @@ export function buildOpenApi() {
   return {
     openapi: '3.0.3',
     info: {
-      title: 'Arogya HMIS API',
+      title: 'MP HMIS API',
       version: '1.0.0',
       description:
         'Hospital Management Information System API. All traffic passes through the API gateway: '

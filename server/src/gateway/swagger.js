@@ -45,7 +45,7 @@ const PAGE = `<!DOCTYPE html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Arogya HMIS API — Documentation</title>
+  <title>MP HMIS API — Documentation</title>
   <link rel="stylesheet" href="./swagger-ui.css">
 </head>
 <body>
