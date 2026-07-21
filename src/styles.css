@@ -390,7 +390,11 @@ input, select, textarea { font-family: inherit; }
 @media (max-width: 1180px) {
   .sidenav { width: 74px; padding: 14px 9px; }
   .brand-name, .nav-item .lab, .nav-user .txt { display: none; }
-  .topbar-brand { display: flex; max-width: 46%; }
+  /* the collapsed rail / bottom-nav shows the active section, so hand the
+     header over to the government department name — always visible. */
+  .topbar-brand { display: flex; flex: 1 1 auto; min-width: 0; }
+  .topbar .tt { display: none; }
+  .top-search { display: none; }
   .nav-item { justify-content: center; padding: 12px 0; }
   .nav-user { justify-content: center; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -408,10 +412,6 @@ input, select, textarea { font-family: inherit; }
   .app { flex-direction: column; }
   .sidenav { display: none; }
   .topbar { padding: 10px 14px; gap: 10px; }
-  .top-search { display: none; }
-  /* the bottom nav already labels the current section, so free the room for the app name */
-  .topbar .tt { display: none; }
-  .topbar-brand { max-width: none; flex: 1 1 auto; }
   .topbar-brand .tb-name b { font-size: 13.5px; white-space: normal; }
   .content { padding: 14px 14px 90px; }
   .content.fixed { padding: 0; }
