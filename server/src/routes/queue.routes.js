@@ -25,6 +25,18 @@ route({
 });
 
 route({
+  method: 'get', path: '/seen',
+  summary: 'Completed consultations today (read-only)',
+  description: 'Tokens marked done today — doctor & nurse open these as a read-only record with current status.',
+  auth: { perm: 'queue:read' },
+  query: z.object({ dept: z.string().max(60).optional() }),
+  responses: { 200: { description: "Today's completed tokens, most recent first", schema: z.array(z.any()) } },
+  handler: async (req, res) => {
+    res.json(await getDam().getSeenToday(req.query.dept || null));
+  },
+});
+
+route({
   method: 'post', path: '/tokens',
   summary: 'Issue a token for an existing patient (revisit)',
   auth: { perm: 'tokens:issue' },

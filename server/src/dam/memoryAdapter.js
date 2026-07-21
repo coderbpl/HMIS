@@ -595,6 +595,31 @@ export function createMemoryAdapter() {
       return { ...c, dept: t.dept };
     },
 
+    /** Completed tokens for today (read-only "seen" list for doctor/nurse). */
+    async getSeenToday(dept) {
+      return db.tokens
+        .filter(t => t.date === today() && t.status === 'done' && (!dept || t.dept === dept))
+        .sort((a, b) => (b.calledAt || '').localeCompare(a.calledAt || ''))
+        .map(t => ({ ...t, patient: db.patients.find(p => p.id === t.patientId) || null }));
+    },
+
+    /** The saved consultation for a token — for the read-only record view. */
+    async getConsultByToken(tokenId) {
+      const t = db.tokens.find(x => x.id === tokenId || x.tokenNo === tokenId);
+      if (!t) return null;
+      const c = [...db.consults].reverse().find(x => x.tokenId === t.id) || null;
+      const rx = [...db.prescriptions].reverse().find(x => x.tokenId === t.id) || null;
+      return {
+        token: { id: t.id, tokenNo: t.tokenNo, status: t.status, dept: t.dept, complaint: t.complaint || '' },
+        patient: db.patients.find(p => p.id === t.patientId) || null,
+        consult: c && {
+          ...c,
+          doctorName: db.users.find(u => u.id === c.doctorId)?.name || 'Doctor',
+        },
+        prescription: rx && { id: rx.id, status: rx.status, items: rx.items },
+      };
+    },
+
     async listDepartments() { return DEPARTMENTS; },
 
     async audit({ actorId, action, entity, entityId, detail }) {
@@ -696,11 +721,18 @@ export function createMemoryAdapter() {
       if (filters.facilityCode) {
         list = list.filter(p => p.facilityCode === filters.facilityCode);
       }
-      return list.map(p => ({
-        ...p,
-        patient: db.patients.find(pt => pt.id === p.patientId) || null,
-        doctorName: db.users.find(u => u.id === p.doctorId)?.name || 'Doctor'
-      }));
+      return list.map(p => {
+        const tok = db.tokens.find(t => t.id === p.tokenId);
+        const pat = db.patients.find(pt => pt.id === p.patientId) || null;
+        return {
+          ...p,
+          patient: pat,
+          patientName: pat?.name || null,
+          tokenNo: tok?.tokenNo || null,
+          dept: tok?.dept || null,
+          doctorName: db.users.find(u => u.id === p.doctorId)?.name || 'Doctor',
+        };
+      });
     },
 
     async updatePrescriptionStatus(id, status, pharmacistId) {

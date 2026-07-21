@@ -244,6 +244,30 @@ export function createMssqlAdapter() {
       return { id: `C-${c.ConsultId}`, tokenId, dispo: c.Disposition, completedAt: c.CompletedAt, dept: c.Department };
     },
 
+    async getSeenToday(dept) {
+      const res = await exec('dbo.usp_Queue_SeenToday', r => r.input('Department', sql.NVarChar(60), dept || null));
+      return res.recordset.map(r => ({ ...rowToToken(r), patient: rowToPatient(r) }));
+    },
+
+    async getConsultByToken(tokenId) {
+      const res = await exec('dbo.usp_Consult_GetByToken', r =>
+        r.input('TokenRef', sql.VarChar(16), String(tokenId).replace(/^T-/, '')));
+      const c = res.recordsets?.[0]?.[0];
+      if (!c) return null;
+      const pat = res.recordsets?.[1]?.[0];
+      const rx = res.recordsets?.[2]?.[0];
+      return {
+        token: { id: `T-${c.TokenId}`, tokenNo: c.TokenNo, status: c.Status, dept: c.Department, complaint: c.Complaint || '' },
+        patient: pat ? rowToPatient(pat) : null,
+        consult: c.ConsultId ? {
+          id: `C-${c.ConsultId}`, dx: c.Diagnosis, dispo: c.Disposition, notes: c.Notes,
+          rx: JSON.parse(c.RxJson || '[]'), labs: JSON.parse(c.LabsJson || '[]'),
+          completedAt: c.CompletedAt, doctorName: c.DoctorName,
+        } : null,
+        prescription: rx ? { id: `PR-${rx.PrescriptionId}`, status: rx.Status, items: JSON.parse(rx.ItemsJson || '[]') } : null,
+      };
+    },
+
     async listDepartments() {
       const res = await exec('dbo.usp_Department_List');
       return res.recordset.map(r => ({ code: r.Code, name: r.Name, series: r.Series }));
@@ -375,6 +399,9 @@ export function createMssqlAdapter() {
         dispensedBy: r.dispensedBy ? `U-${r.dispensedBy}` : null,
         dispensedAt: r.dispensedAt,
         doctorName: r.doctorName,
+        patientName: r.patientName,
+        tokenNo: r.tokenNo,
+        dept: r.dept,
         patient: {
           id: r.PatientCode,
           name: r.patientName,

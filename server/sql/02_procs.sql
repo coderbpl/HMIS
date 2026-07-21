@@ -378,6 +378,59 @@ BEGIN
 END;
 GO
 
+-- Completed ("seen") tokens today — read-only list for doctor/nurse.
+CREATE OR ALTER PROCEDURE dbo.usp_Queue_SeenToday @Department NVARCHAR(60) = NULL
+AS
+BEGIN
+  SET NOCOUNT ON;
+  SELECT t.TokenId, dbo.fn_DisplayToken(t.DeptId, t.SeqNo) AS TokenNo,
+         t.TokenDate, t.Status, t.Priority, t.Category, t.Source, t.SlotTime,
+         t.VitalsDone, t.IssuedAt, t.ArrivedAt, t.CalledAt,
+         p.PatientCode, p.FullName, p.Mobile, p.Age, p.Sex, d.Name AS Department,
+         p.Abha, p.Scheme, p.BloodGroup, p.AllergiesJson, p.FoodAllergiesJson, p.FamilyJson,
+         p.ConditionsJson, p.MedsJson, t.Complaint, NULL AS LastVisit,
+         v.Bp, v.Pulse, v.Temp, v.Spo2, v.Rr, v.Weight, v.Height, v.RecordedAt AS VitalsAt
+  FROM dbo.Tokens t
+  JOIN dbo.Patients p ON p.PatientId = t.PatientId
+  JOIN dbo.Departments d ON d.DeptId = t.DeptId
+  OUTER APPLY (SELECT TOP 1 Bp, Pulse, Temp, Spo2, Rr, Weight, Height, RecordedAt
+               FROM dbo.Vitals WHERE TokenId = t.TokenId ORDER BY RecordedAt DESC) v
+  WHERE t.TokenDate = CAST(SYSUTCDATETIME() AS DATE) AND t.Status = 'done'
+    AND (@Department IS NULL OR d.Name = @Department)
+  ORDER BY t.CalledAt DESC;
+END;
+GO
+
+-- Saved consultation for a token (read-only record view): 3 result sets.
+CREATE OR ALTER PROCEDURE dbo.usp_Consult_GetByToken @TokenRef VARCHAR(16)
+AS
+BEGIN
+  SET NOCOUNT ON;
+  DECLARE @TokenId INT = TRY_CAST(@TokenRef AS INT);
+  -- (1) token + latest consult
+  SELECT t.TokenId, dbo.fn_DisplayToken(t.DeptId, t.SeqNo) AS TokenNo, t.Status,
+         d.Name AS Department, t.Complaint,
+         c.ConsultId, c.Diagnosis, c.Disposition, c.Notes, c.RxJson, c.LabsJson,
+         c.CompletedAt, u.FullName AS DoctorName
+  FROM dbo.Tokens t
+  JOIN dbo.Departments d ON d.DeptId = t.DeptId
+  OUTER APPLY (SELECT TOP 1 * FROM dbo.Consults WHERE TokenId = t.TokenId ORDER BY ConsultId DESC) c
+  LEFT JOIN dbo.Users u ON u.UserId = c.DoctorId
+  WHERE t.TokenId = @TokenId;
+  -- (2) patient
+  SELECT p.PatientCode, p.FullName, p.Mobile, p.Age, p.Sex, d.Name AS Department,
+         p.Abha, p.Scheme, p.BloodGroup, p.AllergiesJson, p.FoodAllergiesJson, p.FamilyJson,
+         p.ConditionsJson, p.MedsJson, NULL AS Complaint, NULL AS LastVisit,
+         NULL AS Bp, NULL AS Pulse, NULL AS Temp, NULL AS Spo2, NULL AS Rr, NULL AS Weight, NULL AS Height, NULL AS VitalsAt
+  FROM dbo.Tokens t JOIN dbo.Patients p ON p.PatientId = t.PatientId
+  JOIN dbo.Departments d ON d.DeptId = p.DeptId
+  WHERE t.TokenId = @TokenId;
+  -- (3) prescription
+  SELECT TOP 1 PrescriptionId, Status, ItemsJson FROM dbo.Prescriptions
+  WHERE TokenId = @TokenId ORDER BY PrescriptionId DESC;
+END;
+GO
+
 -- Public board: masked names only, no identifiers, no clinical data.
 CREATE OR ALTER PROCEDURE dbo.usp_Queue_PublicBoard @Department NVARCHAR(60) = NULL
 AS
@@ -760,10 +813,13 @@ BEGIN
          pr.PatientId AS patientId, pr.DoctorId AS doctorId, pr.FacilityCode AS facilityCode,
          pr.Status AS status, pr.ItemsJson AS items, pr.DispensedBy AS dispensedBy,
          pr.DispensedAt AS dispensedAt, u.FullName AS doctorName,
-         p.PatientCode, p.FullName AS patientName, p.Age, p.Sex, p.Mobile
+         p.PatientCode, p.FullName AS patientName, p.Age, p.Sex, p.Mobile,
+         dbo.fn_DisplayToken(t.DeptId, t.SeqNo) AS tokenNo, d.Name AS dept
   FROM dbo.Prescriptions pr
   JOIN dbo.Patients p ON p.PatientId = pr.PatientId
   JOIN dbo.Users u ON u.UserId = pr.DoctorId
+  JOIN dbo.Tokens t ON t.TokenId = pr.TokenId
+  JOIN dbo.Departments d ON d.DeptId = t.DeptId
   WHERE (@Status IS NULL OR pr.Status = @Status)
     AND (@FacilityCode IS NULL OR pr.FacilityCode = @FacilityCode);
 END;

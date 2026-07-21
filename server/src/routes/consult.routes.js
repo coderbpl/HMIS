@@ -8,6 +8,23 @@ import { emitQueueChange } from '../events.js';
 const { router, route } = createGatewayRouter('/api/consults', 'OPD Consultations');
 
 route({
+  method: 'get', path: '/by-token/:tokenId',
+  summary: 'Read-only saved consultation for a token',
+  description: 'Returns the completed consultation (diagnosis, prescription, labs, disposition) plus current prescription status — for the doctor/nurse read-only record view.',
+  auth: { perm: 'queue:read' },
+  params: z.object({ tokenId: fields.id }),
+  responses: {
+    200: { description: 'The record', schema: z.any() },
+    404: { description: 'No token', schemaRef: 'Error' },
+  },
+  handler: async (req, res) => {
+    const rec = await getDam().getConsultByToken(req.params.tokenId);
+    if (!rec) return res.status(404).json({ error: 'No record for this token', correlationId: req.id });
+    res.json(rec);
+  },
+});
+
+route({
   method: 'post', path: '/',
   summary: 'Complete a consultation',
   description: 'Saves diagnosis, prescription, lab orders and disposition; marks the token done and pushes the queue update to every connected board.',

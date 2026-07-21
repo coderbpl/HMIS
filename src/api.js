@@ -61,6 +61,8 @@ export const api = {
   registerPatient: fields => request('/patients', { method: 'POST', body: fields }),
   searchPatients: query => request(`/patients?query=${encodeURIComponent(query)}`),
   getQueue: dept => request(`/queue${dept ? `?dept=${encodeURIComponent(dept)}` : ''}`),
+  getSeen: dept => request(`/queue/seen${dept ? `?dept=${encodeURIComponent(dept)}` : ''}`),
+  getConsultByToken: tokenId => request(`/consults/by-token/${encodeURIComponent(tokenId)}`),
   issueToken: body => request('/queue/tokens', { method: 'POST', body }),
   updateTokenStatus: (id, status) => request(`/queue/tokens/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: { status } }),
   saveVitals: (id, vitals) => request(`/queue/tokens/${encodeURIComponent(id)}/vitals`, { method: 'PATCH', body: vitals }),

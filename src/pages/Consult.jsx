@@ -12,11 +12,24 @@ import Ehr from './Ehr.jsx';
 
 const dosesPerDay = d => d === 'SOS' ? 1 : d.split('-').reduce((s, x) => s + Number(x), 0);
 
+// Common OPD diagnoses — bilingual chip label (shown) → canonical value (stored).
+const COMMON_DX = [
+  { hin: 'मधुमेह', en: 'Diabetes', value: 'E11.9 Type 2 diabetes mellitus' },
+  { hin: 'उच्च रक्तचाप', en: 'HTN', value: 'I10 Essential hypertension' },
+  { hin: 'दमा', en: 'Asthma', value: 'J45.9 Asthma' },
+  { hin: 'एनीमिया', en: 'Anaemia', value: 'D64.9 Anaemia, unspecified' },
+  { hin: 'थायरॉइड', en: 'Thyroid', value: 'E03.9 Hypothyroidism' },
+  { hin: 'एंजाइना', en: 'Angina · BA40', value: 'I20.9 Angina pectoris' },
+  { hin: 'बुखार', en: 'Fever', value: 'R50.9 Fever, unspecified' },
+  { hin: 'सर्दी-जुकाम', en: 'URTI', value: 'J06.9 Acute upper respiratory infection (URTI)' },
+  { hin: 'दस्त', en: 'Gastroenteritis', value: 'A09.9 Gastroenteritis, unspecified' },
+];
+
 const TABS = [
   { key: 'overview', label: 'Overview', hin: 'सारांश', icon: 'doc' },
   { key: 'vitals', label: 'Vitals', hin: 'वाइटल्स', icon: 'pulse' },
   { key: 'allergy', label: 'Allergy & Blood', hin: 'एलर्जी', icon: 'warn' },
-  { key: 'history', label: 'Notes & History', hin: 'नोट्स', icon: 'clip' },
+  { key: 'history', label: 'Clinical Notes', hin: 'नोट्स · इतिहास', icon: 'clip' },
   { key: 'ehr', label: 'e-HR Record', hin: 'हेल्थ रिकॉर्ड', icon: 'history' },
   { key: 'diagnosis', label: 'Diagnosis', hin: 'निदान', icon: 'stetho' },
   { key: 'prescription', label: 'Prescription', hin: 'पर्ची', icon: 'pill' },
@@ -300,24 +313,33 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
         <div className="card">
           <SecHead title="Presenting complaint" sub="recorded at triage · editable" />
           <textarea className="f-area" value={complaint} onChange={e => setComplaint(e.target.value)} style={{ minHeight: 90 }} placeholder="Chief complaint & duration…" />
-          {(p.allergies?.length > 0 || foodAllergies.length > 0) && (
+          {(medAllergies.length > 0 || foodAllergies.length > 0) && (
             <div className="note-band" style={{ marginTop: 14, background: '#FBE5E3', borderColor: '#F2B8B3' }}>
               <span className="nd" style={{ background: 'var(--red)' }} />
-              <div><b>Allergies: {[...(p.allergies || []), ...foodAllergies].join(', ')}</b><span>Verify before prescribing — every Rx screen re-warns.</span></div>
+              <div><b>Allergies: {[...medAllergies, ...foodAllergies].join(', ')}</b><span>Verify before prescribing — every Rx screen re-warns.</span></div>
             </div>
           )}
         </div>
+        {/* Quick clinical snapshot only — the full record (chronic, allergies,
+            labs, past visits) lives once in the e-HR tab to avoid duplication. */}
         <div className="card">
-          <SecHead title="At a glance" sub="clinical summary" more="Full e-HR →" onMore={openEhr} />
-          <div className="kv"><span className="k">Chronic conditions</span><span className="v">{p.conditions?.length ? p.conditions.join(' · ') : 'None known'}</span></div>
-          <div className="kv"><span className="k">Current medicines</span><span className="v">{p.meds?.length ? p.meds.join(' · ') : 'None'}</span></div>
-          <div className="kv"><span className="k">Allergies</span><span className="v" style={{ color: (p.allergies?.length || foodAllergies.length) ? 'var(--red)' : 'inherit' }}>{[...(p.allergies || []), ...foodAllergies].join(', ') || 'None recorded'}</span></div>
-          <div className="kv"><span className="k">Blood group</span><span className="v">{bloodGroup !== 'Unknown' ? bloodGroup : '— not on record'}</span></div>
-          <div className="kv"><span className="k">Weight / BMI</span><span className="v">{p.weight ? `${p.weight} kg${bmi ? ` · BMI ${bmi} (${bmiBand})` : ''}` : '— take at triage'}</span></div>
-          {famHistory.length > 0 && (
-            <div className="kv"><span className="k">Family history</span><span className="v">{famHistory.map(f => `${f.relation}: ${f.condition}`).join(' · ')}</span></div>
+          <SecHead title="Snapshot" sub="triage vitals · tap for full record" more="Open e-HR →" onMore={openEhr} />
+          <div className="mini-vitals">
+            <div className={`mv ${tones.bp}`}><span className="l">BP</span><b>{fmtV(p.bp)}</b></div>
+            <div className={`mv ${tones.pulse}`}><span className="l">Pulse</span><b>{fmtV(p.pulse)}</b></div>
+            <div className={`mv ${tones.temp}`}><span className="l">Temp °F</span><b>{fmtV(p.temp)}</b></div>
+            <div className={`mv ${tones.spo2}`}><span className="l">SpO₂</span><b>{p.spo2 ? `${p.spo2}%` : '—'}</b></div>
+            <div className="mv"><span className="l">Weight</span><b>{fmtV(p.weight)}</b></div>
+            <div className="mv"><span className="l">BMI</span><b>{bmi ?? '—'}</b></div>
+          </div>
+          {!p.bp && !p.pulse && (
+            <div className="note-band" style={{ marginTop: 12 }}>
+              <span className="nd" /><div><b>Vitals pending</b><span>Send the patient to the nursing desk before consult.</span></div>
+            </div>
           )}
-          <div className="kv"><span className="k">Last visit</span><span className="v">{p.lastVisit || 'First visit'}</span></div>
+          <button type="button" className="btn ghost block" style={{ marginTop: 12 }} onClick={openEhr}>
+            <Icon name="history" size={15} /> Chronic conditions, medicines & lab history — open e-HR
+          </button>
         </div>
       </div>
     ),
@@ -396,7 +418,14 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
         </div>
       </div>
     ),
-    ehr: <Ehr patient={p} />,
+    ehr: <Ehr patient={{
+      ...p,
+      allergies: medAllergies,
+      foodAllergies,
+      bloodGroup: bloodGroup !== 'Unknown' ? bloodGroup : p.bloodGroup,
+      conditions: [...new Set([...(p.conditions || []), ...pastIllness])],
+      familyHistory: famHistory,
+    }} />,
     history: (
       <div className="grid-2eq">
         <div className="card">
@@ -443,23 +472,27 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
     ),
     diagnosis: (
       <div className="card">
-        <SecHead title="Provisional diagnosis" sub={`ICD-10 · ${dxList.length} selected — multiple allowed`} />
+        <SecHead title="निदान · Diagnosis" sub={`add / edit (toggle) · ${dxList.length} selected — multiple allowed`} />
 
-        {dxList.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            {dxList.map(d => (
-              <div className="rx-added" key={d}>
-                <b>{d}</b>
-                <button className="rx-del" onClick={() => toggleDx(d)} aria-label={`Remove ${d}`}>×</button>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* bilingual quick-toggle chips — one tap adds/removes */}
+        <div className="dx-chips">
+          {COMMON_DX.map(d => {
+            const on = dxList.includes(d.value);
+            return (
+              <button key={d.value} type="button" className={`dx-chip ${on ? 'on' : ''}`} onClick={() => toggleDx(d.value)}>
+                <span className="mk">{on ? '✓' : '+'}</span>
+                <span className="hin">{d.hin}</span> · <span className="en">{d.en}</span>
+              </button>
+            );
+          })}
+        </div>
 
-        <div className="f-group" style={{ position: 'relative' }}>
-          <label className="f-label">Search ICD-10 <em>· type 2+ letters, e.g. "diab", "fever", "I10"</em></label>
-          <input className="f-inp" style={{ minHeight: 48, fontSize: 15 }} placeholder="Search by code or name…"
-            value={dxQuery} onChange={e => setDxQuery(e.target.value)} />
+        {/* search + add-other */}
+        <div className="f-group" style={{ position: 'relative', marginTop: 14 }}>
+          <label className="f-label">अन्य जोड़ें / add other <em>· type 2+ letters — code or name (ICD-10)</em></label>
+          <input className="f-inp" style={{ minHeight: 48, fontSize: 15 }} placeholder="e.g. diab, fever, I10, TB…"
+            value={dxQuery} onChange={e => setDxQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && dxResults.length === 0 && dxQuery.trim().length >= 2) { toggleDx(dxQuery.trim()); setDxQuery(''); } }} />
           {dxResults.length > 0 && (
             <div className="search-dropdown-menu">
               {dxResults.map(d => (
@@ -473,16 +506,24 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
           )}
           {dxQuery.trim().length >= 2 && dxResults.length === 0 && (
             <div className="empty" style={{ padding: '10px 0' }}>
-              No match — <button type="button" className="more" style={{ color: 'var(--blue)', fontWeight: 700 }}
+              No ICD match — <button type="button" className="more" style={{ color: 'var(--blue)', fontWeight: 700 }}
                 onClick={() => { toggleDx(dxQuery.trim()); setDxQuery(''); }}>add "{dxQuery.trim()}" as free text</button>
             </div>
           )}
         </div>
 
-        <span className="tlabel">Common in OPD <em>· tap to add / remove</em></span>
-        <BigChips
-          options={['I20.9 Angina pectoris', 'I10 Essential hypertension', 'E11.9 Type 2 diabetes mellitus', 'J06.9 Acute upper respiratory infection (URTI)', 'A09.9 Gastroenteritis, unspecified', 'R50.9 Fever, unspecified']}
-          value={dxList} onChange={setDxList} multi cols={2} />
+        {/* selected list */}
+        {dxList.length > 0 && (
+          <div style={{ marginTop: 6 }}>
+            <span className="tlabel">Selected diagnoses</span>
+            {dxList.map(d => (
+              <div className="rx-added" key={d}>
+                <b>{d}</b>
+                <button className="rx-del" onClick={() => toggleDx(d)} aria-label={`Remove ${d}`}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     ),
     prescription: (

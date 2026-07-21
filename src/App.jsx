@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Shell from './Shell.jsx';
 import Login from './pages/Login.jsx';
 import Consult from './pages/Consult.jsx';
+import ConsultView from './pages/ConsultView.jsx';
 import PatientPortal from './pages/Patient.jsx';
 import { api } from './api.js';
 import { BedBoard, IpdChart } from './pages/IPD.jsx';
@@ -80,10 +81,12 @@ export default function App() {
   const go = p => { setConsultCtx(null); setChartBed(null); setPage(p); };
 
   /** Accepts an API queue row ({ id, tokenNo, patient }) or a mock row ({ pid, token, apiId }). */
-  const openConsult = row => {
+  const openConsult = (row, opts = {}) => {
     const patient = row.patient || PATIENTS.find(p => p.id === row.pid);
     if (!patient) return;
-    setConsultCtx({ patient, tokenId: row.id || row.apiId || null, tokenNo: row.tokenNo || row.token || '' });
+    // a done token (or explicit view) opens the read-only record
+    const readOnly = opts.readOnly || row.status === 'done';
+    setConsultCtx({ patient, tokenId: row.id || row.apiId || null, tokenNo: row.tokenNo || row.token || '', readOnly });
     setPage('consult');
   };
   const openChart = bed => { setChartBed(bed); setPage('ipd-chart'); };
@@ -93,8 +96,12 @@ export default function App() {
   const backPage = roleKey === 'nurse' ? 'ward' : 'ipd';
 
   const body = (() => {
-    if (page === 'consult' && consultCtx)
-      return <Consult patient={consultCtx.patient} tokenId={consultCtx.tokenId} tokenNo={consultCtx.tokenNo} onClose={() => go('opd')} />;
+    if (page === 'consult' && consultCtx) {
+      const back = roleKey === 'nurse' ? 'triage' : 'opd';
+      return consultCtx.readOnly
+        ? <ConsultView patient={consultCtx.patient} tokenId={consultCtx.tokenId} tokenNo={consultCtx.tokenNo} onClose={() => go(back)} />
+        : <Consult patient={consultCtx.patient} tokenId={consultCtx.tokenId} tokenNo={consultCtx.tokenNo} onClose={() => go(back)} />;
+    }
     if (page === 'ipd-chart' && chartBed)
       return <IpdChart bed={chartBed} onClose={() => go(backPage)} />;
 

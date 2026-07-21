@@ -29,6 +29,8 @@ export const DAM_METHODS = [
   'trackToken',           // ({ mobile, tokenNo }) -> { tokenNo, status, position, nowServing } | null
   'listTokensByMobile',   // (mobile) -> [{ tokenNo, dept, date, slot, status }] active today/upcoming
   'saveConsult',          // ({ tokenId, doctorId, dx, rx, labs, dispo, notes }) -> consult
+  'getSeenToday',         // (dept) -> done tokens today [{ ...token, patient }]
+  'getConsultByToken',    // (tokenId) -> { token, patient, consult, prescription } | null (read-only view)
   'listDepartments',      // () -> [{ code, name, series }]
   'audit',                // ({ actorId, action, entity, entityId, detail }) -> void
   

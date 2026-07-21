@@ -20,10 +20,15 @@ export function OpdQueue({ openConsult }) {
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState(null);
 
+  const [seen, setSeen] = useState([]);
   const load = () => api.getQueue()
     .then(r => { setRows(r); setLive(true); })
     .catch(() => { setRows(mockQueue()); setLive(false); });
   useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    if (filter !== 'seen') return;
+    api.getSeen().then(setSeen).catch(() => setSeen([]));
+  }, [filter]);
 
   const start = async (q) => {
     setBusy(q.id);
@@ -45,14 +50,31 @@ export function OpdQueue({ openConsult }) {
           <span> · Room 104 · Dr. Ravi Verma {live ? '· live' : ''}</span>
           {!live && <Pill tone="warn">offline demo</Pill>}
         </div>
-        <div className="seg">
-          {[['all', 'All'], ['waiting', 'Waiting'], ['in-consult', 'In consult'], ['checked-in', 'Checked in']].map(([k, l]) => (
+        <div className="seg" style={{ flexWrap: 'wrap' }}>
+          {[['all', 'All'], ['waiting', 'Waiting'], ['in-consult', 'In consult'], ['checked-in', 'Checked in'], ['seen', 'Seen ✓']].map(([k, l]) => (
             <button key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{l}</button>
           ))}
         </div>
       </div>
-      {shown.length === 0 && <div className="card empty">No patients in this state.</div>}
-      {shown.map(q => {
+      {filter === 'seen' && (
+        seen.length === 0
+          ? <div className="card empty">No completed consultations yet today.</div>
+          : seen.map(q => (
+            <div key={q.id} className="tok">
+              <div className="tno">{q.tokenNo}</div>
+              <div className="tx">
+                <b>{q.patient?.name} · {q.patient?.age} {q.patient?.sex} <span style={{ color: 'var(--muted)', fontWeight: 500 }}>· {q.patient?.id}</span></b>
+                <span>{q.complaint || q.patient?.complaint || q.dept}</span>
+              </div>
+              <div className="acts">
+                <StatusPill s="done" />
+                <button className="btn ghost sm" onClick={() => openConsult(q, { readOnly: true })}><Icon name="doc" size={14} /> View record</button>
+              </div>
+            </div>
+          ))
+      )}
+      {filter !== 'seen' && shown.length === 0 && <div className="card empty">No patients in this state.</div>}
+      {filter !== 'seen' && shown.map(q => {
         const p = q.patient;
         return (
           <div key={q.id} className={`tok ${q.status === 'in-consult' ? 'now' : ''}`}>

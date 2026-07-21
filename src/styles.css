@@ -773,3 +773,42 @@ input, select, textarea { font-family: inherit; }
   .ehr-controls .seg { width: 100%; display: flex; }
   .ehr-controls .seg button { flex: 1; }
 }
+
+/* ============ Diagnosis toggle chips (bilingual) ============ */
+.dx-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.dx-chip {
+  display: flex; align-items: center; gap: 7px; min-height: 50px; padding: 8px 14px;
+  border: 1.5px solid var(--line); background: #fff; border-radius: 13px;
+  font-size: 14px; color: var(--ink); text-align: left; transition: transform .08s, border-color .1s, background .1s;
+}
+.dx-chip .mk { width: 22px; height: 22px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  border-radius: 7px; background: var(--sky); color: var(--blue); font-weight: 800; font-size: 15px; }
+.dx-chip .hin { font-weight: 700; }
+.dx-chip .en { color: var(--muted); font-size: 13px; }
+.dx-chip:active { transform: scale(.97); }
+.dx-chip.on { border-color: var(--blue); background: var(--sky); }
+.dx-chip.on .mk { background: var(--blue); color: #fff; }
+.dx-chip.on .en { color: var(--ink-2); }
+
+/* ============ Overview mini-vitals ============ */
+.mini-vitals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.mini-vitals .mv { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+.mini-vitals .mv .l { display: block; font-size: 11px; color: var(--muted); font-weight: 700; }
+.mini-vitals .mv b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.mini-vitals .mv.warn { border-color: #F2DCAF; background: #FDF7EC; }
+.mini-vitals .mv.bad { border-color: #F2B8B3; background: #FDF0EF; }
+.mini-vitals .mv.bad b { color: var(--red); }
+
+/* ============ Read-only completed consultation ============ */
+.ro-banner {
+  display: flex; align-items: center; gap: 10px; background: #E3F3EC; border: 1px solid #BFE5D4;
+  color: #116B46; border-radius: 12px; padding: 11px 15px; font-weight: 700; font-size: 13px; margin-bottom: 16px;
+}
+.ro-banner .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); flex: 0 0 auto; }
+.ro-sec { margin-bottom: 16px; }
+.ro-sec > .lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-bottom: 7px; }
+@media (max-width: 640px) {
+  .dx-chips { grid-template-columns: 1fr 1fr; }
+  .dx-chip { min-height: 54px; font-size: 13px; }
+  .dx-chip .en { display: none; }
+}
