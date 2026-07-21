@@ -703,45 +703,12 @@ input, select, textarea { font-family: inherit; }
   }
 }
 
-/* ============ EHR OVERLAY ============ */
-.ehr-overlay { position: fixed; inset: 0; z-index: 80; display: flex; justify-content: flex-end; }
-.ehr-scrim { position: absolute; inset: 0; background: rgba(16, 26, 46, .4); }
-.ehr-panel {
-  position: relative; width: min(520px, 94vw); height: 100%; background: var(--bg);
-  display: flex; flex-direction: column; box-shadow: -18px 0 40px rgba(16, 26, 46, .25);
-  animation: ehr-in .22s ease;
-}
-@keyframes ehr-in { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
-.ehr-head {
-  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 14px 18px; background: var(--card); border-bottom: 1px solid var(--line);
-}
-.ehr-head b { font-size: 15px; display: block; }
-.ehr-head span { font-size: 11.5px; color: var(--muted); }
-.ehr-filters { flex: 0 0 auto; display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 18px 4px; }
-.ehr-filters .chip { min-height: 40px; }
-.ehr-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 10px 18px 24px; }
-.ehr-date {
-  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
-  color: var(--muted); margin: 16px 0 8px; position: sticky; top: 0;
-  background: var(--bg); padding: 4px 0;
-}
-.ehr-ev {
-  display: flex; align-items: flex-start; gap: 10px; background: var(--card);
-  border: 1px solid var(--line); border-radius: 13px; padding: 11px 13px; margin-bottom: 8px;
-}
-.ehr-ic { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
-.ehr-tx { flex: 1 1 auto; min-width: 0; }
-.ehr-tx b { font-size: 13px; display: block; }
-.ehr-tx span { font-size: 11.5px; color: var(--ink-2); display: block; margin-top: 1px; }
-.ehr-tx em { font-style: normal; font-size: 10.5px; color: var(--muted); }
-
 /* ============ e-HR (health record) ============ */
 .ehr { max-width: 980px; }
-.ehr-head { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px; box-shadow: var(--shadow); margin-bottom: 14px; }
-.ehr-head .row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.ehr-head .sub { font-size: 12px; color: var(--ink-2); font-weight: 600; margin-top: 2px; }
-.ehr-head .meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.ehr-head { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 16px; box-shadow: var(--shadow); margin-bottom: 14px; }
+.ehr-head .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ehr-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ehr-count { font-size: 11.5px; color: var(--muted); font-weight: 600; }
 .ehr-attn { background: #FDF1DA; border: 1px solid #F2DCAF; border-radius: 13px; padding: 11px 13px; margin-top: 12px; }
 .ehr-attn > b { font-size: 12px; color: #8a5a00; display: block; margin-bottom: 8px; }
 .ehr-attn .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0; }
@@ -749,8 +716,9 @@ input, select, textarea { font-family: inherit; }
 .attn-chip b { display: block; font-size: 12.5px; color: #A02E24; }
 .attn-chip span { font-size: 10px; color: var(--muted); }
 .attn-chip:active { transform: scale(.97); }
-.ehr-chronic { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 11.5px; color: var(--ink-2); margin-top: 12px; }
-.ehr-chronic b { color: var(--ink); }
+.ehr-chronic { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--ink-2); margin-top: 12px; padding: 10px 12px; background: var(--sky); border-radius: 11px; }
+.ehr-chronic > span { display: inline-flex; gap: 5px; }
+.ehr-chronic b { color: var(--navy); }
 
 .ehr-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .ehr-controls .seg button { min-height: 44px; }

@@ -259,7 +259,7 @@ export default function PatientPortal({ onExit }) {
     <div className="portal">
       <div className="portal-bar">
         <div className="brand-mark"><Icon name="cross" /></div>
-        <div><b style={{ fontSize: 14 }}>{HOSPITAL.name}</b><div style={{ fontSize: 10.5, color: '#BBD0F4' }}>{HOSPITAL.sub} · Patient view <span className="hin">· रोगी</span></div></div>
+        <div><b className="hin" style={{ fontSize: 14 }}>{HOSPITAL.name}</b><div className="hin" style={{ fontSize: 10.5, color: '#BBD0F4' }}>{HOSPITAL.sub} · Patient view · रोगी</div></div>
         <span className="sp" />
         <button className="btn ghost sm" style={{ background: 'rgba(255,255,255,.14)', border: 0, color: '#fff' }} onClick={onExit}>
           <Icon name="out" size={14} /> Staff sign-in

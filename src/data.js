@@ -1,4 +1,8 @@
-export const HOSPITAL = { name: 'Arogya HMIS', sub: 'District Hospital · Bhopal' };
+export const HOSPITAL = {
+  name: 'मध्य प्रदेश शासन',
+  sub: 'लोक स्वास्थ्य एवं चिकित्सा शिक्षा',
+  facility: 'District Hospital · Bhopal',
+};
 
 export const ROLES = [
   { key: 'doctor', name: 'Doctor', hin: 'डॉक्टर', desc: 'OPD consults, IPD rounds, prescriptions', persona: 'Dr. Ravi Verma', detail: 'General Medicine · MD', color: '#EAF1FD', ink: '#16357E', icon: 'stetho' },

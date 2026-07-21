@@ -48,7 +48,7 @@ export default function Login({ onAuthed, onOffline, onPatient }) {
         <div className="ring" style={{ width: 220, height: 220, right: -40, bottom: 60 }} />
         <div className="brand" style={{ padding: 0 }}>
           <div className="brand-mark"><Icon name="cross" /></div>
-          <div className="brand-name"><b>{HOSPITAL.name}</b><span>{HOSPITAL.sub}</span></div>
+          <div className="brand-name"><b className="hin">{HOSPITAL.name}</b><span className="hin">{HOSPITAL.sub}</span></div>
         </div>
         <h1>One hospital.<br />Every workflow connected.</h1>
         <p>Integrated OPD, IPD, pharmacy, laboratory and billing — designed for desktops at the counter, tablets on rounds and phones on the move.</p>

@@ -124,21 +124,24 @@ export default function Ehr({ patient: p }) {
   }, [q]);
   const selTest = EHR_TESTS.find(t => t.k === sel);
 
-  const chronic = p.conditions?.length ? p.conditions.join(' · ') : 'Type-2 Diabetes (2019) · Hypertension (2021)';
+  const chronic = p.conditions?.length ? p.conditions.join(' · ') : 'None recorded';
   const allergyLine = [...(p.allergies || []), ...(p.foodAllergies || [])].join(', ') || 'None recorded';
 
   return (
     <div className="ehr">
-      {/* header */}
+      {/* header — identity lives in the consult top-bar; this shows the clinical summary only */}
       <div className="ehr-head">
         <div className="row">
-          <div>
-            <b style={{ fontSize: 17 }}>{p.name}</b>
-            <div className="sub">{p.age}/{p.sex} · UHID {p.id}</div>
+          <div className="ehr-title">
+            <Pill tone="info">e-HR · हेल्थ रिकॉर्ड</Pill>
+            <span className="ehr-count">{EHR_VISITS.length} visits · {totalReports()} lab reports · cross-facility</span>
           </div>
-          <Pill tone="info">e-HR · हेल्थ रिकॉर्ड</Pill>
         </div>
-        <div className="meta">ABHA {p.abha || '—'} · {EHR_VISITS.length} visits · {totalReports()} lab reports · cross-facility (demo data)</div>
+        <div className="ehr-chronic">
+          <span><b>Chronic:</b> {chronic}</span>
+          <span><b>Allergy:</b> <em style={{ fontStyle: 'normal', color: allergyLine === 'None recorded' ? 'inherit' : 'var(--red)' }}>{allergyLine}</em></span>
+          <span><b>Blood group:</b> {p.bloodGroup || '—'}</span>
+        </div>
         {abnormal.length > 0 && (
           <div className="ehr-attn">
             <b>⚠ Needs attention · {abnormal.length} abnormal (latest reports)</b>
@@ -152,11 +155,6 @@ export default function Ehr({ patient: p }) {
             </div>
           </div>
         )}
-        <div className="ehr-chronic">
-          <span><b>Chronic:</b> {chronic}</span>
-          <span><b>Allergy:</b> {allergyLine}</span>
-          <span><b>Blood group:</b> {p.bloodGroup || 'B+'}</span>
-        </div>
       </div>
 
       {/* controls */}

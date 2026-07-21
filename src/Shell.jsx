@@ -8,7 +8,7 @@ export default function Shell({ role, nav, page, setPage, title, subtitle, onLog
       <aside className="sidenav">
         <div className="brand">
           <div className="brand-mark"><Icon name="cross" /></div>
-          <div className="brand-name"><b>{HOSPITAL.name}</b><span>{HOSPITAL.sub}</span></div>
+          <div className="brand-name"><b className="hin">{HOSPITAL.name}</b><span className="hin">{HOSPITAL.sub}</span></div>
         </div>
         <nav className="nav-list">
           {nav.map(n => (

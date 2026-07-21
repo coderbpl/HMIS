@@ -16,8 +16,8 @@ const TABS = [
   { key: 'overview', label: 'Overview', hin: 'सारांश', icon: 'doc' },
   { key: 'vitals', label: 'Vitals', hin: 'वाइटल्स', icon: 'pulse' },
   { key: 'allergy', label: 'Allergy & Blood', hin: 'एलर्जी', icon: 'warn' },
-  { key: 'history', label: 'History', hin: 'इतिहास', icon: 'history' },
-  { key: 'ehr', label: 'e-HR Record', hin: 'हेल्थ रिकॉर्ड', icon: 'doc' },
+  { key: 'history', label: 'Notes & History', hin: 'नोट्स', icon: 'clip' },
+  { key: 'ehr', label: 'e-HR Record', hin: 'हेल्थ रिकॉर्ड', icon: 'history' },
   { key: 'diagnosis', label: 'Diagnosis', hin: 'निदान', icon: 'stetho' },
   { key: 'prescription', label: 'Prescription', hin: 'पर्ची', icon: 'pill' },
   { key: 'orders', label: 'Lab Orders', hin: 'जांच', icon: 'flask' },
@@ -78,19 +78,9 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
   const [done, setDone] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState('');
-  // EHR overlay — full patient timeline from the API
-  const [ehrOpen, setEhrOpen] = useState(false);
-  const [ehrEvents, setEhrEvents] = useState(null);
-  const [ehrBusy, setEhrBusy] = useState(false);
-  const openEhr = async () => {
-    setEhrOpen(true);
-    if (ehrEvents) return;
-    setEhrBusy(true);
-    try { setEhrEvents(await api.patientHistory(p.id)); }
-    catch { setEhrEvents([]); }
-    finally { setEhrBusy(false); }
-  };
-  
+  // jump straight to the full e-HR record tab (single source of past history)
+  const openEhr = () => setTab('ehr');
+
   // Custom states for inputs to support templates
   const [complaint, setComplaint] = useState(p.complaint || '');
   const [notes, setNotes] = useState('Exertional chest discomfort for 3 days, relieved by rest. No radiation. Associated breathlessness climbing 1 flight.');
@@ -308,31 +298,26 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
     overview: (
       <div className="grid-2eq">
         <div className="card">
-          <SecHead title="Presenting complaint" sub="recorded at triage" />
-          <textarea className="f-area" value={complaint} onChange={e => setComplaint(e.target.value)} style={{ minHeight: 80 }} />
-          <SecHead title="Active conditions" />
-          {p.conditions && p.conditions.length ? p.conditions.map(c => (
-            <div className="kv" key={c}><span className="k">Chronic</span><span className="v">{c}</span></div>
-          )) : <div className="empty">No known chronic conditions</div>}
-          {p.allergies && p.allergies.length > 0 && (
+          <SecHead title="Presenting complaint" sub="recorded at triage · editable" />
+          <textarea className="f-area" value={complaint} onChange={e => setComplaint(e.target.value)} style={{ minHeight: 90 }} placeholder="Chief complaint & duration…" />
+          {(p.allergies?.length > 0 || foodAllergies.length > 0) && (
             <div className="note-band" style={{ marginTop: 14, background: '#FBE5E3', borderColor: '#F2B8B3' }}>
               <span className="nd" style={{ background: 'var(--red)' }} />
-              <div><b>Allergies: {p.allergies.join(', ')}</b><span>Verify before prescribing.</span></div>
+              <div><b>Allergies: {[...(p.allergies || []), ...foodAllergies].join(', ')}</b><span>Verify before prescribing — every Rx screen re-warns.</span></div>
             </div>
           )}
         </div>
         <div className="card">
-          <SecHead title="Snapshot" />
-          <div className="kv"><span className="k">UHID</span><span className="v">{p.id}</span></div>
-          <div className="kv"><span className="k">ABHA</span><span className="v">{p.abha}</span></div>
-          <div className="kv"><span className="k">Department</span><span className="v">{p.dept}</span></div>
-          <div className="kv"><span className="k">Last visit</span><span className="v">{p.lastVisit}</span></div>
-          <div className="kv"><span className="k">Current meds</span><span className="v">{p.meds && p.meds.length ? p.meds.join(' · ') : 'None'}</span></div>
+          <SecHead title="At a glance" sub="clinical summary" more="Full e-HR →" onMore={openEhr} />
+          <div className="kv"><span className="k">Chronic conditions</span><span className="v">{p.conditions?.length ? p.conditions.join(' · ') : 'None known'}</span></div>
+          <div className="kv"><span className="k">Current medicines</span><span className="v">{p.meds?.length ? p.meds.join(' · ') : 'None'}</span></div>
+          <div className="kv"><span className="k">Allergies</span><span className="v" style={{ color: (p.allergies?.length || foodAllergies.length) ? 'var(--red)' : 'inherit' }}>{[...(p.allergies || []), ...foodAllergies].join(', ') || 'None recorded'}</span></div>
           <div className="kv"><span className="k">Blood group</span><span className="v">{bloodGroup !== 'Unknown' ? bloodGroup : '— not on record'}</span></div>
-          <div className="kv"><span className="k">Weight / BMI</span><span className="v">{fmtV(p.weight)} kg{bmi ? ` · BMI ${bmi} (${bmiBand})` : ''}</span></div>
+          <div className="kv"><span className="k">Weight / BMI</span><span className="v">{p.weight ? `${p.weight} kg${bmi ? ` · BMI ${bmi} (${bmiBand})` : ''}` : '— take at triage'}</span></div>
           {famHistory.length > 0 && (
             <div className="kv"><span className="k">Family history</span><span className="v">{famHistory.map(f => `${f.relation}: ${f.condition}`).join(' · ')}</span></div>
           )}
+          <div className="kv"><span className="k">Last visit</span><span className="v">{p.lastVisit || 'First visit'}</span></div>
         </div>
       </div>
     ),
@@ -415,25 +400,19 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
     history: (
       <div className="grid-2eq">
         <div className="card">
-          <SecHead title="Visit timeline" sub="EMR · ABHA linked" />
-          <div className="tl">
-            <div className="tl-item"><b>OPD · General Medicine</b><span>{p.lastVisit}</span><p>Routine review. Medication compliance good. Advised diet control and follow-up in 4 weeks.</p></div>
-            <div className="tl-item"><b>Lab · HbA1c 7.9%</b><span>28 May 2026</span><p>Above target. Metformin continued; lifestyle counselling given.</p></div>
-            <div className="tl-item"><b>OPD · First registration</b><span>14 Jan 2024</span><p>Registered under NCD screening camp. Baseline workup ordered.</p></div>
-          </div>
-        </div>
-        <div className="card">
-          <SecHead title="Clinical notes" sub="this visit" />
+          <SecHead title="This visit's notes" sub="past records live in the e-HR tab" more="Open e-HR →" onMore={openEhr} />
           <label className="f-label">History of present illness</label>
           <textarea className="f-area" placeholder="Onset, duration, aggravating factors…" value={notes} onChange={e => setNotes(e.target.value)} />
           <label className="f-label" style={{ marginTop: 12 }}>Examination findings</label>
           <textarea className="f-area" placeholder="General and systemic examination findings..." value={exam} onChange={e => setExam(e.target.value)} />
-
-          <SecHead title="Past illness" sub="tap all that apply" />
+        </div>
+        <div className="card">
+          <SecHead title="History taking" sub="recorded on the patient record" />
+          <span className="tlabel">Past illness <em>· tap all that apply</em></span>
           <BigChips options={PAST_ILLNESS} value={pastIllness} onChange={setPastIllness} multi cols={3} />
 
           <SecHead title="Family history" sub="who has what — e.g. Father · Diabetes" />
-          <span className="tlabel">Relation</span>
+          <span className="tlabel">Relation <em>· माता / पिता आदि</em></span>
           <BigChips options={FH_RELATIONS} value={famRelation} onChange={setFamRelation} cols={4} />
           <span className="tlabel" style={{ marginTop: 10 }}>Condition</span>
           <BigChips options={FH_CONDITIONS} value={famCondition} onChange={setFamCondition} cols={3} />
@@ -653,23 +632,20 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
           <button className="icon-btn" onClick={onClose} title="Back to queue"><Icon name="back" /></button>
           <div className="who">
             <b>{p.name} · {p.age} {p.sex}</b>
-            <span>{p.id} · ABHA {p.abha}</span>
+            <span>{p.id}{p.abha ? ` · ABHA ${p.abha}` : ''}</span>
           </div>
           <div className="meta">
             {tokenNo && <Pill tone="info">Token {tokenNo}</Pill>}
             <Pill tone="info">{p.dept}</Pill>
+            {bloodGroup && bloodGroup !== 'Unknown' && <Pill tone="neu">Blood {bloodGroup}</Pill>}
             {p.allergies && p.allergies.map(a => <Pill key={a} tone="bad">⚠ {a}</Pill>)}
             <StatusPill s="in-consult" />
           </div>
           <div className="acts">
-            <button className="btn ghost sm" onClick={openEhr}><Icon name="history" size={14} /> EHR</button>
+            <button className="btn ghost sm" onClick={openEhr}><Icon name="history" size={14} /> e-HR</button>
             <button className="btn ghost sm" onClick={() => window.print()}><Icon name="clip" size={14} /> Print slip</button>
           </div>
         </div>
-
-        {ehrOpen && (
-          <EhrPanel patient={p} events={ehrEvents} busy={ehrBusy} onClose={() => setEhrOpen(false)} />
-        )}
 
         {/* Dynamic Facility & Template control bar */}
         <div className="consult-bar">
@@ -739,76 +715,3 @@ export default function Consult({ patient, tokenId, tokenNo, onClose }) {
   );
 }
 
-/* ---------- EHR overlay: full patient timeline, filter by category, grouped by date ---------- */
-const EHR_TYPES = [
-  { key: 'all', label: 'All', icon: 'history' },
-  { key: 'visit', label: 'Visits', icon: 'cal' },
-  { key: 'vitals', label: 'Vitals', icon: 'pulse' },
-  { key: 'consult', label: 'Consults', icon: 'stetho' },
-  { key: 'rx', label: 'Prescriptions', icon: 'pill' },
-];
-const EHR_TONE = { visit: 'neu', vitals: 'warn', consult: 'info', rx: 'ok' };
-
-function EhrPanel({ patient, events, busy, onClose }) {
-  const [filter, setFilter] = useState('all');
-  const list = (events || []).filter(e => filter === 'all' || e.type === filter);
-  const counts = (events || []).reduce((m, e) => ({ ...m, [e.type]: (m[e.type] || 0) + 1 }), {});
-  // group by date, newest first (API already sorts newest-first)
-  const groups = [];
-  list.forEach(e => {
-    const g = groups.find(x => x.date === e.date);
-    if (g) g.items.push(e); else groups.push({ date: e.date, items: [e] });
-  });
-  const fmtDate = d => {
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      if (d === today) return 'Today';
-      return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-    } catch { return d; }
-  };
-  return (
-    <div className="ehr-overlay" role="dialog" aria-label={`Health record of ${patient.name}`}>
-      <div className="ehr-scrim" onClick={onClose} />
-      <div className="ehr-panel">
-        <div className="ehr-head">
-          <div>
-            <b>{patient.name} · EHR</b>
-            <span>{patient.id}{patient.abha ? ` · ABHA ${patient.abha}` : ''}{patient.bloodGroup ? ` · ${patient.bloodGroup}` : ''}</span>
-          </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close health record"><Icon name="plus" style={{ transform: 'rotate(45deg)' }} /></button>
-        </div>
-
-        <div className="ehr-filters">
-          {EHR_TYPES.map(t => (
-            <button key={t.key} className={`chip ${filter === t.key ? 'on' : ''}`} onClick={() => setFilter(t.key)}>
-              {t.label}{t.key !== 'all' && counts[t.key] ? ` · ${counts[t.key]}` : ''}
-            </button>
-          ))}
-        </div>
-
-        <div className="ehr-body">
-          {busy && <div className="empty">Loading record…</div>}
-          {!busy && groups.length === 0 && <div className="empty">No history yet for this patient.</div>}
-          {groups.map(g => (
-            <div key={g.date} className="ehr-day">
-              <div className="ehr-date">{fmtDate(g.date)}</div>
-              {g.items.map((e, i) => (
-                <div key={i} className="ehr-ev">
-                  <span className={`ehr-ic pill ${EHR_TONE[e.type] || 'neu'}`}>
-                    <Icon name={EHR_TYPES.find(t => t.key === e.type)?.icon || 'doc'} size={13} />
-                  </span>
-                  <div className="ehr-tx">
-                    <b>{e.title}</b>
-                    {e.detail && <span>{e.detail}</span>}
-                    {(e.doctor || e.recordedBy) && <em>by {e.doctor || e.recordedBy}</em>}
-                  </div>
-                  {e.status && <StatusPill s={e.status} />}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
